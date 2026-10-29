@@ -45,7 +45,8 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
     await setRoomStateInCache(code, state);
     return NextResponse.json(state);
   } catch (e: any) {
-    return NextResponse.json({ error: 'Lỗi lấy thông tin phòng' }, { status: 500 });
+    console.error('Error fetching room state:', e);
+    return NextResponse.json({ error: 'Lỗi lấy thông tin phòng: ' + (e?.message || e) }, { status: 500 });
   }
 }
 
