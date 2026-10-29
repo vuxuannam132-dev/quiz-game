@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/authOptions';
 import { db } from '@/lib/db';
-import { rooms, questions } from '@/lib/schema';
+import { rooms, questions, gameSessions } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
-import { getRoomStateFromCache, setRoomStateInCache } from '@/lib/redis';
+import { getRoomStateFromCache, setRoomStateInCache, invalidateRoomCache } from '@/lib/redis';
 
 export async function GET(req: NextRequest, { params }: { params: { code: string } }) {
   try {
-    const code = params.code.toUpperCase();
+    const code = params.code.toUpperCase().trim();
 
+    // Try cache first
     const cached = await getRoomStateFromCache(code);
     if (cached) return NextResponse.json(cached);
 
@@ -29,16 +32,45 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
     }
 
     const state = {
-      status: room.status, mode: room.mode,
+      code: room.code,
+      status: room.status,
+      mode: room.mode,
       currentQuestionIndex: room.currentQuestionIndex,
       questionRevealed: room.questionRevealed,
-      currentQuestion, settings: room.settings,
-      studentsCount: (room.students as any[]).length,
+      currentQuestion,
+      settings: room.settings,
+      studentsCount: (room.students as any[])?.length ?? 0,
       totalQuestions: room.questionIds?.length ?? 0,
     };
     await setRoomStateInCache(code, state);
     return NextResponse.json(state);
   } catch (e: any) {
-    return NextResponse.json({ error: 'Lỗi lấy phòng' }, { status: 500 });
+    return NextResponse.json({ error: 'Lỗi lấy thông tin phòng' }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: NextRequest, { params }: { params: { code: string } }) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) return NextResponse.json({ error: 'Chưa đăng nhập' }, { status: 401 });
+
+    const code = params.code.toUpperCase().trim();
+    const [room] = await db.select().from(rooms).where(eq(rooms.code, code)).limit(1);
+    if (!room) return NextResponse.json({ error: 'Phòng không tồn tại' }, { status: 404 });
+
+    const userId = (session.user as any).id;
+    const role = (session.user as any).role;
+    if (role !== 'admin' && room.createdBy !== userId) {
+      return NextResponse.json({ error: 'Không có quyền xóa phòng này' }, { status: 403 });
+    }
+
+    // Delete room & game sessions
+    await db.delete(rooms).where(eq(rooms.code, code));
+    await db.delete(gameSessions).where(eq(gameSessions.roomCode, code));
+    await invalidateRoomCache(code);
+
+    return NextResponse.json({ success: true, message: 'Đã xóa phòng thành công' });
+  } catch (e: any) {
+    return NextResponse.json({ error: 'Lỗi xóa phòng: ' + e.message }, { status: 500 });
   }
 }

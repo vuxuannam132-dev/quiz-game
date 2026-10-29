@@ -1,8 +1,8 @@
 'use client';
+
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { v4 as uuidv4 } from 'uuid';
-import { motion, AnimatePresence } from 'framer-motion';
 import { useRoomPolling } from '@/hooks/useRoomPolling';
 import { useTabMonitor } from '@/hooks/useTabMonitor';
 import { useSound } from '@/hooks/useSound';
@@ -24,7 +24,8 @@ interface AnswerResult {
 
 export default function StudentPage() {
   const params = useParams();
-  const code = params.code as string;
+  const code = (params.code as string).toUpperCase().trim();
+
   const [studentName, setStudentName] = useState('');
   const [nameInput, setNameInput] = useState('');
   const [sessionId, setSessionId] = useState('');
@@ -39,12 +40,32 @@ export default function StudentPage() {
   const [totalScore, setTotalScore] = useState(0);
   const [joinError, setJoinError] = useState('');
   const [joining, setJoining] = useState(false);
+  const [monitorEnabled, setMonitorEnabled] = useState(false);
 
-  const { roomState, loading } = useRoomPolling(joined ? code : '', 2000);
+  const { roomState, loading } = useRoomPolling(joined ? code : '', 1500);
   const { leaderboard } = useLeaderboard(code);
   const { play } = useSound(soundEnabled);
 
-  const handleJoin = useCallback(async (name: string, sid: string) => {
+  useEffect(() => {
+    const savedId = localStorage.getItem(`sessionId_${code}`) || uuidv4();
+    localStorage.setItem(`sessionId_${code}`, savedId);
+    setSessionId(savedId);
+
+    const savedName = localStorage.getItem(`studentName_${code}`);
+    if (savedName) {
+      setStudentName(savedName);
+      doJoin(savedName, savedId);
+    }
+  }, [code]);
+
+  // Reset selected answer when question changes
+  const currentQId = (roomState?.currentQuestion as any)?.id || (roomState?.currentQuestion as any)?._id;
+  useEffect(() => {
+    setSelectedAnswer(undefined);
+    setAnswerResult(null);
+  }, [currentQId, roomState?.currentQuestionIndex]);
+
+  const doJoin = async (name: string, sid: string) => {
     setJoining(true);
     setJoinError('');
     try {
@@ -55,59 +76,46 @@ export default function StudentPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
+
       setJoined(true);
       setRoomMode(data.mode);
       setSoundEnabled(data.settings?.soundEnabled ?? true);
+      setMonitorEnabled(data.settings?.monitorTabSwitch ?? false);
       localStorage.setItem(`studentName_${code}`, name);
     } catch (err: any) {
-      setJoinError(err.message);
+      setJoinError(err.message || 'Không thể tham gia phòng');
     } finally {
       setJoining(false);
     }
-  }, [code]);
-
-  useEffect(() => {
-    const savedName = localStorage.getItem(`studentName_${code}`);
-    const savedId = localStorage.getItem(`sessionId_${code}`) || uuidv4();
-    localStorage.setItem(`sessionId_${code}`, savedId);
-    setSessionId(savedId);
-    if (savedName) {
-      setStudentName(savedName);
-      handleJoin(savedName, savedId);
-    }
-  }, [code, handleJoin]);
-
-  // Reset answer when question changes
-  const currentQId = (roomState?.currentQuestion as any)?._id;
-  useEffect(() => {
-    setSelectedAnswer(undefined);
-    setAnswerResult(null);
-  }, [currentQId, roomState?.currentQuestionIndex]);
+  };
 
   const handleNameSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (nameInput.trim().length < 2) return;
     setStudentName(nameInput.trim());
-    handleJoin(nameInput.trim(), sessionId);
+    doJoin(nameInput.trim(), sessionId);
   };
 
-  const handleAnswer = async (answer: string) => {
+  const handleAnswer = useCallback(async (answer: string) => {
     if (selectedAnswer || submitting || !roomState?.currentQuestion) return;
     setSelectedAnswer(answer);
     setSubmitting(true);
+
     try {
+      const questionId = (roomState.currentQuestion as any).id || (roomState.currentQuestion as any)._id;
       const res = await fetch('/api/answer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           roomCode: code,
           sessionId,
-          questionId: (roomState.currentQuestion as any)._id,
+          questionId,
           answer,
           timeSpent: 0,
           tabSwitchCount,
         }),
       });
+
       const data = await res.json();
       if (res.ok && !data.alreadyAnswered) {
         setAnswerResult(data);
@@ -123,7 +131,7 @@ export default function StudentPage() {
     } finally {
       setSubmitting(false);
     }
-  };
+  }, [selectedAnswer, submitting, roomState, code, sessionId, tabSwitchCount, play]);
 
   const handleTabSwitch = useCallback((count: number) => {
     setTabSwitchCount(count);
@@ -135,41 +143,46 @@ export default function StudentPage() {
   }, [play]);
 
   useTabMonitor({
-    enabled: joined && (roomMode === 'exam' || (roomMode === 'practice' && roomState?.settings?.monitorTabSwitch === true)),
+    enabled: joined && (roomMode === 'exam' || (roomMode === 'practice' && monitorEnabled)),
     onSwitch: handleTabSwitch,
     onDisqualify: handleDisqualify,
     maxSwitches: roomState?.settings?.maxTabSwitches || 3,
     mode: roomMode,
   });
 
-  // Name entry screen
+  // Name Input Screen
   if (!joined) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="glass rounded-2xl p-8 w-full max-w-sm">
-          <div className="text-center mb-6">
-            <div className="text-5xl mb-3">🎮</div>
-            <h1 className="text-2xl font-black text-white">Tham gia phòng</h1>
-            <p className="text-electric-blue font-bold text-xl tracking-widest mt-1">{code.toUpperCase()}</p>
-          </div>
+      <div className="min-h-screen bg-brand-bg flex items-center justify-center p-4">
+        <div className="bg-white border-2 border-slate-200 rounded-3xl p-8 max-w-sm w-full shadow-xl text-center">
+          <div className="text-6xl mb-3">👋</div>
+          <h1 className="text-2xl font-black text-slate-900 mb-1">Nhập biệt danh</h1>
+          <p className="text-xs font-bold text-slate-400 mb-6 uppercase tracking-wider">
+            Phòng: <span className="text-brand-blue font-mono font-black">{code}</span>
+          </p>
+
           <form onSubmit={handleNameSubmit} className="space-y-4">
-            {joinError && <p className="text-red-400 text-sm text-center">{joinError}</p>}
-            <div>
-              <label className="block text-sm text-gray-400 mb-1">Tên của bạn</label>
-              <input
-                value={nameInput}
-                onChange={(e) => setNameInput(e.target.value)}
-                placeholder="Nhập tên..."
-                maxLength={50}
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white text-center text-lg focus:border-electric-blue focus:outline-none"
-              />
-            </div>
+            {joinError && (
+              <div className="bg-red-50 border-2 border-red-200 text-brand-red text-sm font-bold p-3 rounded-2xl">
+                {joinError}
+              </div>
+            )}
+
+            <input
+              value={nameInput}
+              onChange={(e) => setNameInput(e.target.value)}
+              placeholder="Tên của bạn..."
+              maxLength={30}
+              autoFocus
+              className="w-full bg-slate-100 border-4 border-slate-200 focus:border-brand-blue rounded-2xl py-4 text-center text-2xl font-black text-slate-900 placeholder:text-slate-300 focus:outline-none transition-all"
+            />
+
             <button
               type="submit"
               disabled={nameInput.trim().length < 2 || joining}
-              className="w-full py-3 bg-electric-blue hover:bg-blue-400 text-white font-bold rounded-xl transition-colors disabled:opacity-50"
+              className="btn-liquid w-full py-4 bg-brand-blue hover:bg-blue-600 text-white font-black text-xl rounded-2xl shadow-button-3d transition-all disabled:opacity-40"
             >
-              {joining ? '⟳ Đang tham gia...' : '🚀 Tham gia'}
+              {joining ? 'Đang vào...' : 'Sẵn sàng! 🚀'}
             </button>
           </form>
         </div>
@@ -180,155 +193,105 @@ export default function StudentPage() {
   // Disqualified
   if (disqualified) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center gap-6">
-        <div className="text-8xl">🚫</div>
-        <h1 className="text-3xl font-black text-red-400">Bị loại!</h1>
-        <p className="text-gray-400">Bạn đã chuyển tab quá nhiều lần ({tabSwitchCount} lần).</p>
-        <p className="text-gray-500 text-sm">Liên hệ giáo viên để được hỗ trợ.</p>
+      <div className="min-h-screen bg-brand-bg flex flex-col items-center justify-center p-6 text-center">
+        <div className="text-8xl mb-4">🚫</div>
+        <h1 className="text-3xl font-black text-brand-red mb-2">Bị loại khỏi trận đấu!</h1>
+        <p className="text-slate-500 font-medium">Bạn đã chuyển tab {tabSwitchCount} lần vi phạm quy chế thi.</p>
       </div>
     );
   }
 
-  if (loading && !roomState) {
+  // Waiting in Lobby
+  if (roomState?.status === 'waiting') {
     return (
-      <div className="min-h-screen flex items-center justify-center text-electric-blue animate-pulse">
-        Đang kết nối...
+      <div className="min-h-screen bg-brand-bg flex flex-col items-center justify-center p-6 text-center">
+        <div className="text-8xl mb-4 animate-bounce">🕹️</div>
+        <h1 className="text-3xl font-black text-slate-900 mb-1">Xin chào, {studentName}!</h1>
+        <p className="text-slate-500 font-bold mb-6">Bạn đã vào phòng thành công. Nhìn lên bảng chờ giáo viên bắt đầu nhé!</p>
+
+        <div className="bg-white border-2 border-slate-200 rounded-2xl px-6 py-3 shadow-sm flex items-center gap-2">
+          <span className="w-3 h-3 rounded-full bg-green-500 animate-pulse" />
+          <span className="font-mono font-black text-brand-dark tracking-widest text-lg">Mã PIN: {code}</span>
+        </div>
       </div>
     );
   }
 
-  if (!roomState) {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-red-400">
-        Không thể kết nối phòng
-      </div>
-    );
-  }
-
-  // Attention banner (learning mode paused)
-  if (roomState.status === 'paused' && roomMode === 'learning') {
+  // Teacher paused -> attention banner
+  if (roomState?.status === 'paused' && roomMode === 'learning') {
     return <AttentionBanner visible={true} />;
   }
 
-  // Waiting
-  if (roomState.status === 'waiting') {
+  // Game Finished
+  if (roomState?.status === 'finished') {
+    const myRank = leaderboard.find((e) => e.studentName === studentName);
     return (
-      <WaitingScreen
-        studentName={studentName}
-        studentsCount={roomState.studentsCount}
-        roomCode={code.toUpperCase()}
-      />
-    );
-  }
-
-  // Finished
-  if (roomState.status === 'finished') {
-    const myEntry = leaderboard.find((e) => e.studentName === studentName);
-    return (
-      <div className="min-h-screen p-6">
-        <div className="max-w-lg mx-auto text-center">
-          <div className="text-6xl mb-4">🏁</div>
-          <h1 className="text-3xl font-black text-white mb-2">Kết thúc!</h1>
-          {myEntry && (
-            <div className="glass rounded-2xl p-6 mb-6">
-              <p className="text-gray-400 text-sm mb-1">Điểm của bạn</p>
-              <p className="text-5xl font-black text-yellow-400">{myEntry.totalScore.toLocaleString()}</p>
-              <p className="text-gray-400 mt-2">Xếp hạng #{myEntry.rank} • {myEntry.correctCount} câu đúng</p>
-            </div>
-          )}
-          <Leaderboard entries={leaderboard} />
-        </div>
+      <div className="min-h-screen bg-brand-bg p-6 max-w-md mx-auto text-center">
+        <div className="text-7xl mb-4">🏆</div>
+        <h1 className="text-3xl font-black text-slate-900 mb-2">Trận đấu kết thúc!</h1>
+        {myRank && (
+          <div className="bg-white border-2 border-slate-200 rounded-3xl p-6 shadow-xl mb-6">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Thành tích của bạn</span>
+            <div className="text-5xl font-black text-brand-yellow mb-2">{myRank.totalScore.toLocaleString()}</div>
+            <p className="font-bold text-slate-700">Hạng #{myRank.rank} • Đúng {myRank.correctCount} câu</p>
+          </div>
+        )}
+        <Leaderboard entries={leaderboard} />
       </div>
     );
   }
 
-  // Playing
-  const showRevealResult = roomState.questionRevealed && (answerResult || selectedAnswer);
-
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: '#0f0f23' }}>
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
-        <div className="text-white font-bold text-sm">{studentName}</div>
-        <div className="text-yellow-400 font-bold">{totalScore.toLocaleString()} điểm</div>
+    <div className="min-h-screen flex flex-col bg-slate-900 text-white select-none">
+      {/* Top Bar for student */}
+      <div className="bg-slate-800/80 backdrop-blur-md px-5 py-3 border-b border-slate-700 flex items-center justify-between">
+        <div className="font-black text-sm truncate max-w-[120px]">{studentName}</div>
+        <div className="text-brand-yellow font-black text-lg">{totalScore.toLocaleString()} pts</div>
         {roomMode === 'exam' && tabSwitchCount > 0 && (
-          <div className="text-red-400 text-xs">⚠️ Tab: {tabSwitchCount}</div>
+          <div className="text-red-400 text-xs font-bold">⚠️ Tab: {tabSwitchCount}</div>
         )}
       </div>
 
-      {/* Question content */}
-      {roomState.currentQuestion && (
-        <div className="p-4">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-gray-400 text-sm">
-              Câu {roomState.currentQuestionIndex + 1}/{roomState.totalQuestions}
-            </span>
-            {roomMode === 'exam' && roomState.settings?.timeLimit && !selectedAnswer && (
-              <Timer
-                timeLimit={roomState.settings.timeLimit}
-                onTimeUp={() => handleAnswer('__timeout__')}
-                isRunning={roomState.status === 'playing' && !selectedAnswer}
-              />
-            )}
-          </div>
-
-          {/* Question text */}
-          <div className="glass rounded-2xl p-4 mb-4">
-            {roomState.currentQuestion.imageUrl && (
-              <img
-                src={roomState.currentQuestion.imageUrl}
-                alt="Question image"
-                className="w-full max-h-48 object-contain rounded-lg mb-3"
-              />
-            )}
-            <p className="text-white text-lg font-medium leading-relaxed">
-              {roomState.currentQuestion.content}
-            </p>
-          </div>
-
-          {/* Answer area */}
-          <AnimatePresence mode="wait">
-            {showRevealResult ? (
-              <motion.div
-                key="result"
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0 }}
-              >
-                <ResultFeedback
-                  correct={answerResult?.correct ?? false}
-                  points={answerResult?.points ?? 0}
-                  correctAnswer={answerResult?.correctAnswer ?? ''}
-                  explanation={answerResult?.explanation}
-                />
-              </motion.div>
-            ) : (
-              <motion.div key="answers" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                <AnswerGrid
-                  question={roomState.currentQuestion}
-                  selectedAnswer={selectedAnswer}
-                  onAnswer={handleAnswer}
-                  disabled={!!selectedAnswer || submitting || roomState.status !== 'playing'}
-                />
-                {selectedAnswer && !answerResult && (
-                  <div className="text-center mt-4 text-gray-400 text-sm animate-pulse">
-                    ✅ Đã nộp bài, chờ công bố đáp án...
-                  </div>
-                )}
-              </motion.div>
-            )}
-          </AnimatePresence>
+      {/* Main Answer Area (Kahoot Style - 4 BIG Shapes) */}
+      {!roomState?.questionRevealed && roomState?.currentQuestion && (
+        <div className="flex-1 flex flex-col justify-center">
+          {selectedAnswer ? (
+            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center animate-bounce-in">
+              <span className="text-7xl mb-4">✋</span>
+              <h2 className="text-3xl font-black mb-2">Đã chọn đáp án:</h2>
+              <div className="inline-block bg-white text-slate-900 px-8 py-3 rounded-2xl text-4xl font-black shadow-2xl mb-4">
+                {selectedAnswer}
+              </div>
+              <p className="text-slate-400 font-bold text-sm">Chờ giáo viên công bố kết quả nhé...</p>
+            </div>
+          ) : (
+            <AnswerGrid
+              question={roomState.currentQuestion}
+              onAnswer={handleAnswer}
+              disabled={!!selectedAnswer || submitting}
+              selectedAnswer={selectedAnswer}
+            />
+          )}
         </div>
       )}
 
-      {/* Paused state */}
-      {roomState.status === 'paused' && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <div className="glass rounded-2xl p-8 text-center">
-            <div className="text-5xl mb-4">⏸️</div>
-            <h2 className="text-2xl font-black text-white">Tạm dừng</h2>
-            <p className="text-gray-400 mt-2">Chờ giáo viên tiếp tục...</p>
-          </div>
+      {/* When Revealed: Instant feedback */}
+      {roomState?.questionRevealed && (
+        <div className="flex-1 flex flex-col justify-center p-6 text-center">
+          {answerResult ? (
+            <ResultFeedback
+              correct={answerResult.correct}
+              points={answerResult.points}
+              correctAnswer={answerResult.correctAnswer}
+              explanation={answerResult.explanation}
+            />
+          ) : (
+            <div className="bg-slate-800 p-8 rounded-3xl border border-slate-700">
+              <span className="text-6xl block mb-3">⏰</span>
+              <h3 className="text-2xl font-black text-slate-300">Hết giờ!</h3>
+              <p className="text-slate-400 text-sm mt-1">Bạn chưa kịp bấm câu trả lời này.</p>
+            </div>
+          )}
         </div>
       )}
     </div>

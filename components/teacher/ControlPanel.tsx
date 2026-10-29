@@ -7,11 +7,11 @@ import { RoomStateResponse } from '@/types';
 interface ControlPanelProps {
   roomState: RoomStateResponse;
   roomCode: string;
-  adminCode: string;
+  adminCode?: string;
   onAction: (action: string) => Promise<void>;
 }
 
-export function ControlPanel({ roomState, roomCode, adminCode, onAction }: ControlPanelProps) {
+export function ControlPanel({ roomState, roomCode, onAction }: ControlPanelProps) {
   const [loading, setLoading] = useState<string | null>(null);
 
   const handleAction = async (action: string) => {
@@ -28,8 +28,15 @@ export function ControlPanel({ roomState, roomCode, adminCode, onAction }: Contr
   const isLast = currentQuestionIndex >= totalQuestions - 1;
 
   return (
-    <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 space-y-4">
-      <h3 className="text-white font-bold text-lg border-b border-white/10 pb-3">🎮 Điều khiển</h3>
+    <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200 space-y-5">
+      <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+        <h3 className="text-slate-900 font-black text-lg flex items-center gap-2">
+          <span>🎮</span> Điều khiển trận đấu
+        </h3>
+        <span className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1 rounded-full border border-slate-200">
+          {mode === 'exam' ? '🏆 Chế độ Thi đấu' : mode === 'practice' ? '⚡ Chế độ Luyện tập' : '📚 Chế độ Học tập'}
+        </span>
+      </div>
 
       <div className="space-y-3">
         {/* Start button */}
@@ -37,9 +44,9 @@ export function ControlPanel({ roomState, roomCode, adminCode, onAction }: Contr
           <Button
             onClick={() => handleAction('start')}
             loading={loading === 'start'}
-            color="green"
+            variant="start"
             icon="▶"
-            label="Bắt đầu"
+            label="Bắt đầu trận đấu"
           />
         )}
 
@@ -48,9 +55,9 @@ export function ControlPanel({ roomState, roomCode, adminCode, onAction }: Contr
           <Button
             onClick={() => handleAction('resume')}
             loading={loading === 'resume'}
-            color="green"
+            variant="resume"
             icon="▶"
-            label="Tiếp tục"
+            label="Tiếp tục trận đấu"
           />
         )}
 
@@ -59,20 +66,9 @@ export function ControlPanel({ roomState, roomCode, adminCode, onAction }: Contr
           <Button
             onClick={() => handleAction('reveal')}
             loading={loading === 'reveal'}
-            color="blue"
+            variant="reveal"
             icon="📢"
             label="Công bố đáp án"
-          />
-        )}
-
-        {/* Previous question */}
-        {(status === 'playing' || status === 'paused') && currentQuestionIndex > 0 && (
-          <Button
-            onClick={() => handleAction('prev')}
-            loading={loading === 'prev'}
-            color="gray"
-            icon="⏮"
-            label="Câu trước"
           />
         )}
 
@@ -81,53 +77,72 @@ export function ControlPanel({ roomState, roomCode, adminCode, onAction }: Contr
           <Button
             onClick={() => handleAction('next')}
             loading={loading === 'next'}
-            color="blue"
+            variant="next"
             icon="⏭"
             label="Câu tiếp theo"
           />
         )}
 
-        {/* Pause (learning mode only) */}
-        {status === 'playing' && mode === 'learning' && (
-          <Button
-            onClick={() => handleAction('pause')}
-            loading={loading === 'pause'}
-            color="yellow"
-            icon="⏸"
-            label="Dừng / Chú ý"
-          />
-        )}
+        <div className="flex flex-wrap sm:flex-nowrap gap-2 pt-1">
+          {/* Previous question */}
+          {(status === 'playing' || status === 'paused') && currentQuestionIndex > 0 && (
+            <button
+              onClick={() => handleAction('prev')}
+              disabled={loading === 'prev'}
+              className="btn-liquid flex-1 py-3 px-4 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm transition-all flex items-center justify-center gap-1.5 border border-slate-200"
+            >
+              {loading === 'prev' ? <span className="animate-spin">⟳</span> : <span>⏮</span>}
+              <span>Câu trước</span>
+            </button>
+          )}
 
-        {/* Finish */}
-        {(status === 'playing' || status === 'paused') && (
-          <Button
-            onClick={() => handleAction('finish')}
-            loading={loading === 'finish'}
-            color="red"
-            icon="🏁"
-            label="Kết thúc"
-            confirm="Bạn có chắc muốn kết thúc phòng?"
-          />
-        )}
+          {/* Pause (learning mode only) */}
+          {status === 'playing' && mode === 'learning' && (
+            <button
+              onClick={() => handleAction('pause')}
+              disabled={loading === 'pause'}
+              className="btn-liquid flex-1 py-3 px-4 rounded-2xl bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold text-sm transition-all flex items-center justify-center gap-1.5 border border-amber-200"
+            >
+              {loading === 'pause' ? <span className="animate-spin">⟳</span> : <span>⏸</span>}
+              <span>Tạm dừng</span>
+            </button>
+          )}
+
+          {/* Finish */}
+          {(status === 'playing' || status === 'paused') && (
+            <button
+              onClick={() => {
+                if (window.confirm('Bạn có chắc muốn kết thúc phòng chơi này?')) {
+                  handleAction('finish');
+                }
+              }}
+              disabled={loading === 'finish'}
+              className="btn-liquid flex-1 py-3 px-4 rounded-2xl bg-red-50 hover:bg-red-100 text-brand-red font-bold text-sm transition-all flex items-center justify-center gap-1.5 border border-red-200"
+            >
+              {loading === 'finish' ? <span className="animate-spin">⟳</span> : <span>🏁</span>}
+              <span>Kết thúc</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Quick info */}
-      <div className="border-t border-white/10 pt-3 space-y-2 text-sm">
-        <div className="flex justify-between text-gray-400">
-          <span>Mã phòng:</span>
-          <span className="text-electric-blue font-mono font-bold">{roomCode}</span>
+      <div className="border-t border-slate-100 pt-3 space-y-2 text-xs font-bold text-slate-500">
+        <div className="flex justify-between items-center">
+          <span>Mã phòng PIN:</span>
+          <span className="text-slate-900 font-mono font-black text-sm">{roomCode}</span>
         </div>
-        <div className="flex justify-between text-gray-400">
-          <span>Câu hiện tại:</span>
-          <span className="text-white">{currentQuestionIndex + 1} / {totalQuestions}</span>
+        <div className="flex justify-between items-center">
+          <span>Tiến độ câu hỏi:</span>
+          <span className="text-brand-blue font-black">{currentQuestionIndex + 1} / {totalQuestions}</span>
         </div>
-        <div className="flex justify-between text-gray-400">
-          <span>Trạng thái:</span>
-          <span className={`font-medium ${
-            status === 'playing' ? 'text-green-400' :
-            status === 'paused' ? 'text-yellow-400' :
-            status === 'finished' ? 'text-gray-400' :
-            'text-blue-400'
+        <div className="flex justify-between items-center">
+          <span>Trạng thái phòng:</span>
+          <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-black border ${
+            status === 'playing' ? 'bg-green-100 text-green-700 border-green-200' :
+            status === 'paused' ? 'bg-amber-100 text-amber-700 border-amber-200' :
+            status === 'finished' ? 'bg-slate-100 text-slate-600 border-slate-200' :
+            'bg-blue-100 text-brand-blue border-blue-200'
           }`}>
             {status === 'waiting' ? 'Chờ bắt đầu' :
              status === 'playing' ? 'Đang chơi' :
@@ -142,43 +157,36 @@ export function ControlPanel({ roomState, roomCode, adminCode, onAction }: Contr
 interface ButtonProps {
   onClick: () => void;
   loading: boolean;
-  color: 'green' | 'blue' | 'yellow' | 'red' | 'gray';
+  variant: 'start' | 'resume' | 'reveal' | 'next';
   icon: string;
   label: string;
-  confirm?: string;
 }
 
-function Button({ onClick, loading, color, icon, label, confirm }: ButtonProps) {
-  const colors = {
-    green: 'bg-green-600 hover:bg-green-500 border-green-500',
-    blue: 'bg-blue-600 hover:bg-blue-500 border-blue-500',
-    yellow: 'bg-yellow-600 hover:bg-yellow-500 border-yellow-500',
-    red: 'bg-red-700 hover:bg-red-600 border-red-600',
-    gray: 'bg-gray-700 hover:bg-gray-600 border-gray-600',
-  };
-
-  const handleClick = () => {
-    if (confirm && !window.confirm(confirm)) return;
-    onClick();
+function Button({ onClick, loading, variant, icon, label }: ButtonProps) {
+  const styles = {
+    start: 'bg-brand-red hover:bg-red-600 text-white shadow-button-3d',
+    resume: 'bg-brand-green hover:bg-green-600 text-white shadow-button-3d',
+    reveal: 'bg-brand-yellow hover:bg-amber-500 text-slate-900 shadow-button-3d',
+    next: 'bg-brand-blue hover:bg-blue-600 text-white shadow-button-3d',
   };
 
   return (
     <motion.button
-      whileTap={{ scale: 0.97 }}
-      onClick={handleClick}
+      whileTap={{ scale: 0.98 }}
+      onClick={onClick}
       disabled={loading}
       className={`
-        w-full flex items-center justify-center gap-2 px-4 py-3
-        rounded-xl border font-bold text-white
-        ${colors[color]}
+        w-full btn-liquid flex items-center justify-center gap-3 py-4 px-6
+        rounded-2xl font-black text-xl
+        ${styles[variant]}
         disabled:opacity-50 disabled:cursor-not-allowed
-        transition-colors
+        transition-all
       `}
     >
       {loading ? (
-        <span className="animate-spin">⟳</span>
+        <span className="animate-spin text-xl">⟳</span>
       ) : (
-        <span>{icon}</span>
+        <span className="text-xl">{icon}</span>
       )}
       <span>{label}</span>
     </motion.button>

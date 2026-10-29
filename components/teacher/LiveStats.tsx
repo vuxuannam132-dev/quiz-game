@@ -16,27 +16,29 @@ interface LiveStatsProps {
 }
 
 const BAR_COLORS = {
-  A: 'bg-blue-500',
-  B: 'bg-red-500',
-  C: 'bg-yellow-500',
-  D: 'bg-green-500',
+  A: 'bg-[#E21B3C]',
+  B: 'bg-[#1368CE]',
+  C: 'bg-[#FFA602]',
+  D: 'bg-[#26890C]',
 };
 
 export function LiveStats({ stats, totalStudents, answeredCount }: LiveStatsProps) {
   return (
-    <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6">
+    <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-white font-bold">📊 Thống kê trả lời</h3>
-        <span className="text-sm text-gray-400">
+        <h3 className="text-slate-900 font-black text-lg flex items-center gap-2">
+          <span>📊</span> Thống kê trả lời
+        </h3>
+        <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200">
           {answeredCount}/{totalStudents} học sinh
         </span>
       </div>
 
       {/* Progress bar */}
       <div className="mb-4">
-        <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+        <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
           <motion.div
-            className="h-full bg-electric-blue rounded-full"
+            className="h-full bg-brand-blue rounded-full"
             initial={{ width: 0 }}
             animate={{ width: `${totalStudents > 0 ? (answeredCount / totalStudents) * 100 : 0}%` }}
             transition={{ duration: 0.5 }}
@@ -46,29 +48,31 @@ export function LiveStats({ stats, totalStudents, answeredCount }: LiveStatsProp
 
       <div className="space-y-3">
         {stats.map((stat) => {
-          const color = BAR_COLORS[stat.key as keyof typeof BAR_COLORS] || 'bg-gray-500';
+          const color = BAR_COLORS[stat.key as keyof typeof BAR_COLORS] || 'bg-slate-400';
           return (
             <div key={stat.key} className="flex items-center gap-3">
-              <span className="w-6 font-bold text-white text-sm">{stat.key}</span>
-              <div className="flex-1 h-8 bg-white/10 rounded-lg overflow-hidden relative">
+              <span className="w-6 font-black text-slate-800 text-sm text-center">{stat.key}</span>
+              <div className="flex-1 h-9 bg-slate-100 rounded-xl overflow-hidden relative border border-slate-200">
                 <motion.div
-                  className={`h-full ${color} opacity-80 rounded-lg`}
+                  className={`h-full ${color} rounded-lg`}
                   initial={{ width: 0 }}
                   animate={{ width: `${stat.percentage}%` }}
                   transition={{ duration: 0.5 }}
                 />
-                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-white text-xs font-bold">
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-800 text-xs font-black drop-shadow-sm">
                   {stat.count} ({stat.percentage.toFixed(0)}%)
                 </span>
               </div>
               {stat.isCorrect && (
-                <span className="text-green-400 text-lg">✓</span>
+                <span className="text-green-600 font-black text-lg">✓</span>
               )}
             </div>
           );
         })}
         {stats.length === 0 && (
-          <div className="text-gray-400 text-center py-4 text-sm">Chưa có câu trả lời</div>
+          <div className="text-slate-400 text-center py-4 text-xs font-bold">
+            Chưa có câu trả lời nào được gửi
+          </div>
         )}
       </div>
     </div>

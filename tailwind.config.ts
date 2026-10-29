@@ -9,57 +9,51 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        'deep-purple': '#0f0f23',
-        'electric-blue': '#00d4ff',
-        'hot-pink': '#ff0080',
-        'lime-green': '#39ff14',
-        'neon-orange': '#ff6600',
-        'answer-blue': '#3b82f6',
-        'answer-red': '#ef4444',
-        'answer-yellow': '#eab308',
-        'answer-green': '#22c55e',
+        // Bảng màu mới: Trắng + Đỏ + Xanh (Kahoot style)
+        'brand-red': '#E21B3C',
+        'brand-blue': '#1368CE',
+        'brand-yellow': '#FFA602',
+        'brand-green': '#26890C',
+        'brand-dark': '#0F172A',
+        'brand-bg': '#F8FAFC',
+        
+        // 4 khối đáp án kiểu Kahoot
+        'kahoot-red': '#E21B3C',
+        'kahoot-blue': '#1368CE',
+        'kahoot-yellow': '#D89E00',
+        'kahoot-green': '#26890C',
       },
       animation: {
         'bounce-in': 'bounceIn 0.5s ease-out',
         'shake': 'shake 0.5s ease-in-out',
-        'glow': 'glow 2s ease-in-out infinite alternate',
-        'float': 'float 3s ease-in-out infinite',
-        'pulse-neon': 'pulseNeon 2s ease-in-out infinite',
-        'attention': 'attentionPulse 1s ease-in-out infinite',
+        'pulse-subtle': 'pulseSubtle 2s ease-in-out infinite',
+        'liquid-shine': 'liquidShine 3s ease-in-out infinite',
       },
       keyframes: {
         bounceIn: {
-          '0%': { transform: 'scale(0)', opacity: '0' },
-          '60%': { transform: 'scale(1.2)', opacity: '1' },
+          '0%': { transform: 'scale(0.8)', opacity: '0' },
+          '60%': { transform: 'scale(1.05)', opacity: '1' },
           '100%': { transform: 'scale(1)', opacity: '1' },
         },
         shake: {
           '0%, 100%': { transform: 'translateX(0)' },
-          '25%': { transform: 'translateX(-10px)' },
-          '75%': { transform: 'translateX(10px)' },
+          '20%, 60%': { transform: 'translateX(-8px)' },
+          '40%, 80%': { transform: 'translateX(8px)' },
         },
-        glow: {
-          '0%': { boxShadow: '0 0 5px #00d4ff, 0 0 10px #00d4ff, 0 0 20px #00d4ff' },
-          '100%': { boxShadow: '0 0 10px #00d4ff, 0 0 20px #00d4ff, 0 0 40px #00d4ff' },
+        pulseSubtle: {
+          '0%, 100%': { transform: 'scale(1)' },
+          '50%': { transform: 'scale(1.02)' },
         },
-        float: {
-          '0%, 100%': { transform: 'translateY(0)' },
-          '50%': { transform: 'translateY(-10px)' },
-        },
-        pulseNeon: {
-          '0%, 100%': { opacity: '1', boxShadow: '0 0 5px currentColor' },
-          '50%': { opacity: '0.8', boxShadow: '0 0 20px currentColor, 0 0 40px currentColor' },
-        },
-        attentionPulse: {
-          '0%, 100%': { transform: 'scale(1)', opacity: '1' },
-          '50%': { transform: 'scale(1.05)', opacity: '0.9' },
+        liquidShine: {
+          '0%': { backgroundPosition: '200% 0' },
+          '100%': { backgroundPosition: '-200% 0' },
         },
       },
-      backdropBlur: {
-        xs: '2px',
-      },
-      fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+      boxShadow: {
+        'liquid': '0 8px 32px 0 rgba(31, 38, 135, 0.15), inset 0 1px 0 0 rgba(255, 255, 255, 0.6)',
+        'liquid-hover': '0 12px 40px 0 rgba(31, 38, 135, 0.25), inset 0 1px 0 0 rgba(255, 255, 255, 0.8)',
+        'button-3d': '0 6px 0 0 rgba(0, 0, 0, 0.15)',
+        'button-3d-active': '0 2px 0 0 rgba(0, 0, 0, 0.15)',
       },
     },
   },

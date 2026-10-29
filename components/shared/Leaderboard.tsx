@@ -12,51 +12,57 @@ interface LeaderboardProps {
 
 export function Leaderboard({ entries, animate = true, title = 'Bảng xếp hạng' }: LeaderboardProps) {
   const rankColors: Record<number, string> = {
-    1: 'from-yellow-500/30 to-yellow-600/10 border-yellow-500/50',
-    2: 'from-gray-400/30 to-gray-500/10 border-gray-400/50',
-    3: 'from-orange-600/30 to-orange-700/10 border-orange-600/50',
+    1: 'bg-amber-50 border-amber-300 text-amber-950',
+    2: 'bg-slate-50 border-slate-300 text-slate-800',
+    3: 'bg-orange-50 border-orange-300 text-orange-950',
   };
 
-  const rankTextColors: Record<number, string> = {
-    1: 'text-yellow-400',
-    2: 'text-gray-300',
-    3: 'text-orange-400',
+  const rankBadgeColors: Record<number, string> = {
+    1: 'bg-amber-400 text-white',
+    2: 'bg-slate-400 text-white',
+    3: 'bg-orange-400 text-white',
   };
 
   return (
-    <div className="w-full max-w-lg mx-auto">
-      <h2 className="text-2xl font-bold text-center text-white mb-6">{title}</h2>
-      <div className="space-y-3">
+    <div className="w-full">
+      <h2 className="text-lg font-black text-slate-900 mb-4 flex items-center gap-2">
+        <span>🏆</span> {title}
+      </h2>
+      <div className="space-y-2.5">
         <AnimatePresence>
           {entries.map((entry, index) => (
             <motion.div
               key={entry.studentName + entry.rank}
-              initial={animate ? { opacity: 0, x: -50 } : false}
+              initial={animate ? { opacity: 0, x: -30 } : false}
               animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 50 }}
-              transition={{ delay: index * 0.1 }}
+              exit={{ opacity: 0, x: 30 }}
+              transition={{ delay: index * 0.05 }}
               className={`
-                flex items-center gap-4 p-4 rounded-xl border bg-gradient-to-r
-                ${rankColors[entry.rank] || 'from-white/5 to-white/0 border-white/10'}
+                flex items-center gap-3 p-3 rounded-2xl border-2 transition-all
+                ${rankColors[entry.rank] || 'bg-white border-slate-200 text-slate-800'}
               `}
             >
               <div
-                className={`text-2xl font-black w-12 text-center ${rankTextColors[entry.rank] || 'text-white'}`}
+                className={`text-xs font-black w-7 h-7 rounded-full flex items-center justify-center shrink-0 shadow-sm ${
+                  rankBadgeColors[entry.rank] || 'bg-slate-200 text-slate-700'
+                }`}
               >
                 {getRankSuffix(entry.rank)}
               </div>
               <div className="flex-1 min-w-0">
-                <div className="font-bold text-white truncate">{entry.studentName}</div>
-                <div className="text-sm text-gray-400">{entry.correctCount} câu đúng</div>
+                <div className="font-black text-sm text-slate-900 truncate">{entry.studentName}</div>
+                <div className="text-xs font-semibold text-slate-500">{entry.correctCount} câu đúng</div>
               </div>
-              <div className={`text-xl font-bold tabular-nums ${rankTextColors[entry.rank] || 'text-electric-blue'}`}>
+              <div className="text-sm font-black tabular-nums text-brand-blue">
                 {formatScore(entry.totalScore)}
               </div>
             </motion.div>
           ))}
         </AnimatePresence>
         {entries.length === 0 && (
-          <div className="text-center text-gray-400 py-8">Chưa có dữ liệu</div>
+          <div className="text-center text-slate-400 py-6 text-xs font-bold">
+            Chưa có học sinh nào trên bảng xếp hạng
+          </div>
         )}
       </div>
     </div>

@@ -11,8 +11,24 @@ export const users = pgTable('users', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
+// Bảng bộ câu hỏi (Question Sets)
+export const questionSets = pgTable('question_sets', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  createdBy: text('created_by').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  title: text('title').notNull(),
+  description: text('description').default(''),
+  subject: text('subject').default(''),
+  grade: integer('grade'),
+  coverImage: text('cover_image'),
+  isPublic: boolean('is_public').default(false),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (t) => [
+  index('question_sets_created_by_idx').on(t.createdBy),
+]);
+
 export const questions = pgTable('questions', {
   id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  setId: text('set_id').references(() => questionSets.id, { onDelete: 'cascade' }),
   createdBy: text('created_by').notNull().references(() => users.id, { onDelete: 'cascade' }),
   type: text('type', { enum: ['multiple_choice', 'true_false', 'matching'] }).notNull(),
   subject: text('subject').default(''),
@@ -24,17 +40,18 @@ export const questions = pgTable('questions', {
   matchingPairs: jsonb('matching_pairs').$type<Array<{ left: string; right: string }>>(),
   explanation: text('explanation'),
   tags: text('tags').array().default([]),
+  orderIndex: integer('order_index').default(0),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (t) => [
   index('questions_created_by_idx').on(t.createdBy),
-  index('questions_type_idx').on(t.type),
+  index('questions_set_id_idx').on(t.setId),
 ]);
 
 export const rooms = pgTable('rooms', {
   id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
   code: text('code').notNull().unique(),
-  adminCode: text('admin_code').notNull().unique(),
   createdBy: text('created_by').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  setId: text('set_id').references(() => questionSets.id),
   questionIds: text('question_ids').array().default([]),
   mode: text('mode', { enum: ['learning', 'practice', 'exam'] }).notNull(),
   settings: jsonb('settings').$type<{
@@ -53,7 +70,7 @@ export const rooms = pgTable('rooms', {
   expiresAt: timestamp('expires_at').notNull(),
 }, (t) => [
   index('rooms_created_by_idx').on(t.createdBy),
-  index('rooms_expires_at_idx').on(t.expiresAt),
+  index('rooms_code_idx').on(t.code),
 ]);
 
 export const gameSessions = pgTable('game_sessions', {
@@ -79,7 +96,8 @@ export const gameSessions = pgTable('game_sessions', {
 ]);
 
 export type User = typeof users.$inferSelect;
-export type NewUser = typeof users.$inferInsert;
+export type QuestionSet = typeof questionSets.$inferSelect;
+export type NewQuestionSet = typeof questionSets.$inferInsert;
 export type Question = typeof questions.$inferSelect;
 export type NewQuestion = typeof questions.$inferInsert;
 export type Room = typeof rooms.$inferSelect;

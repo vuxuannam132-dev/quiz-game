@@ -9,81 +9,59 @@ interface QuestionDisplayProps {
   totalQuestions: number;
 }
 
-const OPTION_COLORS = {
-  A: 'from-blue-600/80 to-blue-700/80 border-blue-500',
-  B: 'from-red-600/80 to-red-700/80 border-red-500',
-  C: 'from-yellow-600/80 to-yellow-700/80 border-yellow-500',
-  D: 'from-green-600/80 to-green-700/80 border-green-500',
-};
+const KAHOOT_COLORS = [
+  { key: 'A', bg: 'bg-[#E21B3C]', border: 'border-[#B0142E]', shape: '▲' },
+  { key: 'B', bg: 'bg-[#1368CE]', border: 'border-[#0D4B96]', shape: '◆' },
+  { key: 'C', bg: 'bg-[#D89E00]', border: 'border-[#A37700]', shape: '●' },
+  { key: 'D', bg: 'bg-[#26890C]', border: 'border-[#1C6609]', shape: '■' },
+];
 
 export function QuestionDisplay({ question, questionNumber, totalQuestions }: QuestionDisplayProps) {
   if (!question) return null;
 
   return (
-    <div className="flex flex-col gap-6 p-8 w-full">
-      {/* Question number */}
-      <div className="flex items-center justify-between">
-        <span className="text-electric-blue text-xl font-bold">
+    <div className="flex-1 flex flex-col justify-between p-8 max-w-6xl mx-auto w-full">
+      {/* Top Question Header */}
+      <div className="text-center mb-6">
+        <span className="inline-block bg-slate-200 text-slate-700 px-4 py-1 rounded-full text-sm font-bold mb-3">
           Câu {questionNumber} / {totalQuestions}
         </span>
-        {question.subject && (
-          <span className="px-3 py-1 rounded-full bg-white/10 text-gray-300 text-sm">
-            {question.subject}
-          </span>
+        <h1 className="text-4xl md:text-5xl font-black text-slate-900 leading-tight drop-shadow-sm">
+          {question.content}
+        </h1>
+
+        {question.imageUrl && (
+          <div className="mt-6 flex justify-center">
+            <img
+              src={question.imageUrl}
+              alt="Câu hỏi"
+              className="max-h-64 rounded-2xl shadow-xl object-contain border-4 border-white"
+            />
+          </div>
         )}
       </div>
 
-      {/* Question content */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        key={question._id as string}
-        className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8"
-      >
-        <p className="text-3xl font-bold text-white leading-relaxed">
-          {question.content}
-        </p>
-        {question.imageUrl && (
-          <div className="mt-6 flex justify-center">
-            <div className="relative max-h-64 overflow-hidden rounded-xl">
-              <img
-                src={question.imageUrl}
-                alt="Hình ảnh câu hỏi"
-                className="max-h-64 object-contain rounded-xl"
-              />
-            </div>
-          </div>
-        )}
-      </motion.div>
-
-      {/* Options */}
-      {question.type !== 'matching' && question.options && (
-        <div className="grid grid-cols-2 gap-4">
-          {question.options.map((option, index) => {
-            const key = option.key as keyof typeof OPTION_COLORS;
+      {/* 4 Answer Options (Kahoot grid) */}
+      {question.options && question.options.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-4">
+          {question.options.map((option, idx) => {
+            const style = KAHOOT_COLORS[idx % KAHOOT_COLORS.length];
             return (
               <motion.div
                 key={option.key}
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: index * 0.1 }}
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.08 }}
                 className={`
-                  relative p-6 rounded-xl border-2 bg-gradient-to-br backdrop-blur-sm
-                  ${OPTION_COLORS[key] || 'from-gray-700/80 to-gray-800/80 border-gray-600'}
+                  ${style.bg} ${style.border} border-b-8 rounded-3xl p-6 text-white
+                  flex items-center gap-5 shadow-lg min-h-[110px]
                 `}
               >
-                <div className="flex items-start gap-4">
-                  <span className="text-3xl font-black text-white opacity-80">{option.key}</span>
-                  <div className="flex-1">
-                    <p className="text-xl font-semibold text-white">{option.text}</p>
-                    {option.imageUrl && (
-                      <img
-                        src={option.imageUrl}
-                        alt={`Lựa chọn ${option.key}`}
-                        className="mt-2 max-h-24 object-contain rounded"
-                      />
-                    )}
-                  </div>
+                <div className="w-14 h-14 rounded-2xl bg-black/20 flex items-center justify-center text-3xl font-black shrink-0">
+                  {style.shape}
+                </div>
+                <div className="flex-1 text-2xl md:text-3xl font-extrabold leading-snug">
+                  {option.text}
                 </div>
               </motion.div>
             );
@@ -92,24 +70,20 @@ export function QuestionDisplay({ question, questionNumber, totalQuestions }: Qu
       )}
 
       {/* Matching type display */}
-      {question.type === 'matching' && (
-        <div className="bg-white/5 rounded-xl p-6">
-          <p className="text-gray-300 text-lg mb-4">Nối các cặp tương ứng:</p>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              {question.matchingPairs?.map((pair, i) => (
-                <div key={i} className="bg-blue-600/30 border border-blue-500/50 rounded-lg p-3 text-white text-lg">
-                  {pair.left}
-                </div>
-              ))}
-            </div>
-            <div className="space-y-2">
-              {question.matchingPairs?.map((pair, i) => (
-                <div key={i} className="bg-green-600/30 border border-green-500/50 rounded-lg p-3 text-white text-lg">
-                  {pair.right}
-                </div>
-              ))}
-            </div>
+      {question.type === 'matching' && question.matchingPairs && question.matchingPairs.length > 0 && (
+        <div className="bg-white rounded-3xl p-6 shadow-md border-2 border-slate-200">
+          <p className="text-slate-700 font-bold text-lg mb-4">Nối các cặp tương ứng:</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {question.matchingPairs.map((pair, idx) => (
+              <div
+                key={idx}
+                className="flex items-center justify-between bg-slate-50 border-2 border-slate-200 rounded-2xl p-4 font-bold text-slate-800"
+              >
+                <span className="text-lg">{pair.left}</span>
+                <span className="text-brand-blue text-2xl font-black">↔</span>
+                <span className="text-lg">{pair.right}</span>
+              </div>
+            ))}
           </div>
         </div>
       )}

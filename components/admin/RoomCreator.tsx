@@ -8,40 +8,100 @@ interface RoomCreatorProps {
   onCancel: () => void;
 }
 
+interface QuestionSet {
+  id: string;
+  title: string;
+  subject?: string;
+  questionCount?: number;
+}
+
 export function RoomCreator({ onCreated, onCancel }: RoomCreatorProps) {
+  const [sets, setSets] = useState<QuestionSet[]>([]);
+  const [selectedSetId, setSelectedSetId] = useState<string>('');
   const [questions, setQuestions] = useState<IQuestion[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [search, setSearch] = useState<string>('');
   const [mode, setMode] = useState<RoomMode>('learning');
   const [settings, setSettings] = useState({
     timeLimit: 30,
-    totalTime: 600,
     soundEnabled: true,
     skipEffects: false,
     monitorTabSwitch: false,
     maxTabSwitches: 3,
   });
-  const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
-  const [fetchingQs, setFetchingQs] = useState(true);
+  const [fetching, setFetching] = useState(true);
 
+  // Load question sets & questions
   useEffect(() => {
     (async () => {
-      setFetchingQs(true);
+      setFetching(true);
       try {
-        const res = await fetch('/api/questions?limit=100');
-        const data = await res.json();
-        setQuestions(data.questions || []);
+        const [resSets, resQs] = await Promise.all([
+          fetch('/api/sets'),
+          fetch('/api/questions?limit=100'),
+        ]);
+        if (resSets.ok) {
+          const data = await resSets.json();
+          setSets(data.sets || []);
+        }
+        if (resQs.ok) {
+          const data = await resQs.json();
+          setQuestions(data.questions || []);
+        }
+      } catch (err) {
+        console.error('Error fetching sets or questions:', err);
       } finally {
-        setFetchingQs(false);
+        setFetching(false);
       }
     })();
   }, []);
 
-  const toggleQuestion = (id: string) =>
-    setSelectedIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+  // When a set is selected, automatically select all its questions
+  const handleSelectSet = (setId: string) => {
+    setSelectedSetId(setId);
+    if (!setId) {
+      setSelectedIds([]);
+      return;
+    }
+    const setQuestions = questions.filter((q: any) => q.setId === setId);
+    if (setQuestions.length > 0) {
+      setSelectedIds(setQuestions.map((q) => q._id));
+    } else {
+      // If set has no direct mapped questions yet, pick all
+      setSelectedIds(questions.map((q) => q._id));
+    }
+  };
+
+  // Toggle individual question cleanly using explicit ID
+  const toggleQuestion = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAll = () => {
+    if (selectedIds.length === questions.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(questions.map((q) => q._id));
+    }
+  };
+
+  const filteredQuestions = questions.filter(
+    (q) =>
+      !search ||
+      q.content.toLowerCase().includes(search.toLowerCase()) ||
+      q.subject?.toLowerCase().includes(search.toLowerCase())
+  );
 
   const handleCreate = async () => {
-    if (selectedIds.length === 0) { alert('Vui lòng chọn ít nhất một câu hỏi'); return; }
+    if (selectedIds.length === 0) {
+      alert('Vui lòng chọn ít nhất một câu hỏi!');
+      return;
+    }
+
     setLoading(true);
     try {
       const res = await fetch('/api/room/create', {
@@ -49,139 +109,201 @@ export function RoomCreator({ onCreated, onCancel }: RoomCreatorProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           questionIds: selectedIds,
+          setId: selectedSetId || undefined,
           mode,
-          settings: { ...settings, monitorTabSwitch: mode === 'exam' ? true : settings.monitorTabSwitch },
+          settings: {
+            ...settings,
+            monitorTabSwitch: mode === 'exam' ? true : settings.monitorTabSwitch,
+          },
         }),
       });
+
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       onCreated(data);
     } catch (err: any) {
-      alert(err.message);
+      alert(err.message || 'Lỗi tạo phòng');
     } finally {
       setLoading(false);
     }
   };
 
-  const TYPE_ICONS: Record<string, string> = { multiple_choice: '🔤', true_false: '✅', matching: '🔗' };
-  const filteredQs = questions.filter(
-    (q) => !search || q.content.toLowerCase().includes(search.toLowerCase()) || q.subject?.toLowerCase().includes(search.toLowerCase())
-  );
-
-  const toggle = (key: keyof typeof settings) =>
-    setSettings((s) => ({ ...s, [key]: !s[key] }));
-
   return (
-    <div className="grid grid-cols-2 gap-6">
-      {/* Left: question bank */}
-      <div className="flex flex-col gap-3">
-        <div className="flex items-center gap-2">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-slate-800">
+      {/* Left: Question selection */}
+      <div className="flex flex-col gap-4">
+        {/* Choose Set */}
+        {sets.length > 0 && (
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-2">
+              📂 Chọn theo Bộ câu hỏi:
+            </label>
+            <select
+              value={selectedSetId}
+              onChange={(e) => handleSelectSet(e.target.value)}
+              className="w-full bg-slate-100 border-2 border-slate-200 rounded-2xl px-4 py-3 font-semibold text-slate-800 focus:border-brand-blue focus:outline-none"
+            >
+              <option value="">-- Tự chọn câu hỏi lẻ --</option>
+              {sets.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.title} ({s.questionCount || 0} câu)
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* Search bar */}
+        <div>
           <input
+            type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Tìm câu hỏi..."
-            className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white placeholder-gray-500 focus:border-electric-blue focus:outline-none text-sm"
+            placeholder="🔍 Tìm kiếm câu hỏi..."
+            className="w-full bg-slate-50 border-2 border-slate-200 rounded-2xl px-4 py-2.5 text-sm font-medium text-slate-800 placeholder-slate-400 focus:border-brand-blue focus:outline-none"
           />
-          <span className="text-gray-400 text-sm whitespace-nowrap">{selectedIds.length} đã chọn</span>
         </div>
-        <div className="overflow-y-auto space-y-1 max-h-80">
-          {fetchingQs ? (
-            <div className="text-center text-gray-400 py-8 text-sm">Đang tải...</div>
-          ) : filteredQs.length === 0 ? (
-            <div className="text-center text-gray-400 py-8 text-sm">Không có câu hỏi</div>
-          ) : filteredQs.map((q) => {
-            const selected = selectedIds.includes(q._id);
-            return (
-              <div
-                key={q._id}
-                onClick={() => toggleQuestion(q._id)}
-                className={`flex items-start gap-2 p-2 rounded-lg cursor-pointer border transition-colors ${
-                  selected ? 'bg-electric-blue/20 border-electric-blue/40' : 'bg-white/5 border-white/10 hover:bg-white/10'
-                }`}
-              >
-                <input type="checkbox" checked={selected} readOnly className="mt-0.5 accent-blue-400" />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1 mb-0.5">
-                    <span className="text-xs">{TYPE_ICONS[q.type]}</span>
-                    {q.subject && <span className="text-xs text-gray-500 bg-white/5 px-1 rounded">{q.subject}</span>}
+
+        {/* Individual Questions List Header */}
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-bold text-slate-700">
+            Danh sách câu hỏi ({selectedIds.length}/{questions.length} đã chọn):
+          </span>
+          <button
+            type="button"
+            onClick={handleSelectAll}
+            className="text-xs font-bold text-brand-blue hover:underline cursor-pointer"
+          >
+            {selectedIds.length === questions.length ? 'Bỏ chọn hết' : 'Chọn tất cả'}
+          </button>
+        </div>
+
+        {/* Questions list */}
+        <div className="overflow-y-auto space-y-2 max-h-80 pr-1">
+          {fetching ? (
+            <div className="text-center py-8 text-slate-400">Đang tải câu hỏi...</div>
+          ) : filteredQuestions.length === 0 ? (
+            <div className="text-center py-8 text-slate-400">
+              {questions.length === 0
+                ? 'Chưa có câu hỏi nào trong ngân hàng'
+                : 'Không tìm thấy câu hỏi phù hợp'}
+            </div>
+          ) : (
+            filteredQuestions.map((q) => {
+              const isChecked = selectedIds.includes(q._id);
+              return (
+                <div
+                  key={q._id}
+                  onClick={(e) => toggleQuestion(q._id, e)}
+                  className={`
+                    flex items-center gap-3 p-3 rounded-2xl border-2 cursor-pointer transition-all
+                    ${
+                      isChecked
+                        ? 'bg-blue-50 border-brand-blue shadow-sm'
+                        : 'bg-white border-slate-200 hover:border-slate-300'
+                    }
+                  `}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    onChange={() => {}}
+                    className="w-5 h-5 accent-brand-blue rounded-md pointer-events-none"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-sm text-slate-800 truncate">{q.content}</p>
+                    <div className="flex gap-2 text-xs text-slate-500 mt-0.5">
+                      {q.subject && (
+                        <span className="bg-slate-100 px-2 py-0.5 rounded-full">
+                          {q.subject}
+                        </span>
+                      )}
+                      <span className="capitalize">{q.type}</span>
+                    </div>
                   </div>
-                  <p className="text-sm text-white truncate">{q.content}</p>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </div>
       </div>
 
-      {/* Right: settings */}
-      <div className="space-y-4">
+      {/* Right: Room Settings */}
+      <div className="space-y-6 flex flex-col justify-between">
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">Chế độ phòng</label>
-          <div className="space-y-2">
-            {([
-              { value: 'learning', label: '📚 Học tập', desc: 'Không giới hạn thời gian, có thể tạm dừng' },
-              { value: 'practice', label: '✏️ Luyện tập', desc: 'Tùy chọn theo dõi chuyển tab' },
-              { value: 'exam', label: '📝 Thi cử', desc: 'Đếm ngược, bắt buộc theo dõi tab' },
-            ] as const).map((m) => (
-              <div key={m.value} onClick={() => setMode(m.value)}
-                className={`p-3 rounded-lg cursor-pointer border transition-colors ${mode === m.value ? 'bg-electric-blue/20 border-electric-blue/50' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}>
-                <div className="font-medium text-white text-sm">{m.label}</div>
-                <div className="text-xs text-gray-400 mt-0.5">{m.desc}</div>
+          <label className="block text-sm font-bold text-slate-700 mb-3">Chế độ chơi:</label>
+          <div className="space-y-3">
+            {[
+              {
+                id: 'learning',
+                title: '📚 Học tập',
+                desc: 'Không giới hạn thời gian, giáo viên kiểm soát từng câu',
+              },
+              {
+                id: 'practice',
+                title: '⚡ Luyện tập',
+                desc: 'Làm bài tự do, thi đấu vui vẻ',
+              },
+              {
+                id: 'exam',
+                title: '🏆 Thi đấu (Kahoot)',
+                desc: 'Đếm ngược tính điểm theo tốc độ trả lời',
+              },
+            ].map((m) => (
+              <div
+                key={m.id}
+                onClick={() => setMode(m.id as RoomMode)}
+                className={`
+                  p-4 rounded-2xl border-2 cursor-pointer transition-all
+                  ${
+                    mode === m.id
+                      ? 'bg-red-50 border-brand-red shadow-md'
+                      : 'bg-white border-slate-200 hover:border-slate-300'
+                  }
+                `}
+              >
+                <div className="font-black text-slate-800">{m.title}</div>
+                <div className="text-xs text-slate-500 mt-1">{m.desc}</div>
               </div>
             ))}
           </div>
-        </div>
 
-        <div className="space-y-3">
+          {/* Time limit option for Exam */}
           {mode === 'exam' && (
-            <>
-              <div className="flex items-center justify-between">
-                <label className="text-sm text-gray-400">Thời gian / câu (giây)</label>
-                <input type="number" value={settings.timeLimit} min={5} max={300}
-                  onChange={(e) => setSettings((s) => ({ ...s, timeLimit: +e.target.value || 30 }))}
-                  className="w-20 bg-white/5 border border-white/10 rounded px-2 py-1 text-white text-sm text-right focus:outline-none" />
-              </div>
-              <div className="flex items-center justify-between">
-                <label className="text-sm text-gray-400">Chuyển tab tối đa</label>
-                <input type="number" value={settings.maxTabSwitches} min={1} max={10}
-                  onChange={(e) => setSettings((s) => ({ ...s, maxTabSwitches: +e.target.value || 3 }))}
-                  className="w-20 bg-white/5 border border-white/10 rounded px-2 py-1 text-white text-sm text-right focus:outline-none" />
-              </div>
-            </>
-          )}
-          {mode === 'practice' && (
-            <div className="flex items-center justify-between">
-              <label className="text-sm text-gray-400">Theo dõi chuyển tab</label>
-              <button onClick={() => toggle('monitorTabSwitch')}
-                className={`relative w-10 h-6 rounded-full transition-colors ${settings.monitorTabSwitch ? 'bg-electric-blue' : 'bg-gray-600'}`}>
-                <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${settings.monitorTabSwitch ? 'translate-x-4' : ''}`} />
-              </button>
+            <div className="mt-4 flex items-center justify-between bg-slate-50 p-4 rounded-2xl border border-slate-200">
+              <span className="text-sm font-bold text-slate-700">⏱ Thời gian mỗi câu:</span>
+              <select
+                value={settings.timeLimit}
+                onChange={(e) =>
+                  setSettings((s) => ({ ...s, timeLimit: Number(e.target.value) }))
+                }
+                className="bg-white border-2 border-slate-200 rounded-xl px-3 py-1.5 font-bold text-slate-800"
+              >
+                <option value={10}>10 giây</option>
+                <option value={20}>20 giây</option>
+                <option value={30}>30 giây</option>
+                <option value={60}>60 giây</option>
+              </select>
             </div>
           )}
-          <div className="flex items-center justify-between">
-            <label className="text-sm text-gray-400">Âm thanh</label>
-            <button onClick={() => toggle('soundEnabled')}
-              className={`relative w-10 h-6 rounded-full transition-colors ${settings.soundEnabled ? 'bg-electric-blue' : 'bg-gray-600'}`}>
-              <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${settings.soundEnabled ? 'translate-x-4' : ''}`} />
-            </button>
-          </div>
-          <div className="flex items-center justify-between">
-            <label className="text-sm text-gray-400">Tắt hiệu ứng</label>
-            <button onClick={() => toggle('skipEffects')}
-              className={`relative w-10 h-6 rounded-full transition-colors ${settings.skipEffects ? 'bg-electric-blue' : 'bg-gray-600'}`}>
-              <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${settings.skipEffects ? 'translate-x-4' : ''}`} />
-            </button>
-          </div>
         </div>
 
-        <div className="flex gap-3 pt-3 border-t border-white/10">
-          <button onClick={onCancel}
-            className="px-4 py-2 rounded-xl border border-white/20 text-gray-400 hover:text-white transition-colors text-sm">
+        {/* Buttons */}
+        <div className="flex gap-4 pt-4 border-t border-slate-200">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="flex-1 py-3 rounded-2xl border-2 border-slate-200 font-bold text-slate-600 hover:bg-slate-100 transition-colors"
+          >
             Hủy
           </button>
-          <button onClick={handleCreate} disabled={loading || selectedIds.length === 0}
-            className="flex-1 px-4 py-2 rounded-xl bg-electric-blue hover:bg-blue-400 text-white font-bold transition-colors disabled:opacity-50 text-sm">
-            {loading ? '⟳ Đang tạo...' : `🎮 Tạo phòng (${selectedIds.length} câu)`}
+          <button
+            type="button"
+            onClick={handleCreate}
+            disabled={loading || selectedIds.length === 0}
+            className="flex-2 py-3 px-6 rounded-2xl bg-brand-red hover:bg-red-600 text-white font-black shadow-button-3d transition-all disabled:opacity-50"
+          >
+            {loading ? 'Đang tạo...' : `🚀 Tạo phòng (${selectedIds.length} câu)`}
           </button>
         </div>
       </div>

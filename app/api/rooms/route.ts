@@ -16,9 +16,9 @@ export async function GET(req: NextRequest) {
       .limit(50);
 
     const result = rows.map(r => ({
-      _id: r.id, code: r.code, adminCode: r.adminCode,
+      _id: r.id, code: r.code, adminCode: (r as any).adminCode ?? r.code,
       mode: r.mode, status: r.status,
-      studentsCount: (r.students as any[]).length,
+      studentsCount: (r.students as any[])?.length ?? 0,
       questionCount: r.questionIds?.length ?? 0,
       createdAt: r.createdAt,
     }));
