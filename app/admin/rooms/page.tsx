@@ -153,20 +153,20 @@ export default function RoomsPage() {
 
             <div className="flex flex-wrap sm:flex-nowrap gap-3 w-full lg:w-auto">
               <a
-                href={`/room/${createdRoom.code}/projector`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn-liquid bg-brand-blue hover:bg-blue-600 text-white font-bold px-5 py-3 rounded-2xl shadow-button-3d text-center flex-1 whitespace-nowrap"
-              >
-                📺 Mở máy chiếu
-              </a>
-              <a
                 href={`/room/${createdRoom.code}/teacher`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="btn-liquid bg-brand-dark hover:bg-slate-800 text-white font-bold px-5 py-3 rounded-2xl shadow-button-3d text-center flex-1 whitespace-nowrap"
+                className="btn-liquid bg-brand-red hover:bg-red-600 text-white font-black px-6 py-3 rounded-2xl shadow-button-3d text-center flex-1 whitespace-nowrap text-sm"
               >
-                🎛️ Bảng điều khiển
+                🎮 Vào phòng điều khiển (Studio)
+              </a>
+              <a
+                href={`/room/${createdRoom.code}/projector`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-liquid bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-4 py-3 rounded-2xl border border-slate-200 text-center flex-1 whitespace-nowrap text-sm"
+              >
+                📺 Tab máy chiếu ngoài
               </a>
               <button
                 onClick={() => setCreatedRoom(null)}
@@ -248,20 +248,21 @@ export default function RoomsPage() {
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-2">
                           <a
-                            href={`/room/${room.code}/projector`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="bg-blue-50 text-brand-blue hover:bg-blue-100 text-xs font-bold px-3 py-1.5 rounded-xl transition-colors"
-                          >
-                            📺 Chiếu
-                          </a>
-                          <a
                             href={`/room/${room.code}/teacher`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-bold px-3 py-1.5 rounded-xl transition-colors"
+                            className="bg-brand-red/10 text-brand-red hover:bg-brand-red hover:text-white text-xs font-black px-3.5 py-1.5 rounded-xl transition-all border border-brand-red/20 shadow-sm"
                           >
-                            🎛️ Điều khiển
+                            🎮 Điều khiển Studio
+                          </a>
+                          <a
+                            href={`/room/${room.code}/projector`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-bold px-3 py-1.5 rounded-xl transition-colors border border-slate-200"
+                            title="Mở tab máy chiếu"
+                          >
+                            📺 Chiếu
                           </a>
                           <button
                             onClick={() => handleDelete(room.code)}
