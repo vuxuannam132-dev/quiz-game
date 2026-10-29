@@ -11,17 +11,23 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     if (!session?.user) return NextResponse.json({ error: 'Chưa đăng nhập' }, { status: 401 });
 
     const [q] = await db.select().from(questions).where(eq(questions.id, params.id)).limit(1);
-    if (!q) return NextResponse.json({ error: 'Không tìm thấy' }, { status: 404 });
+    if (!q) return NextResponse.json({ error: 'Không tìm thấy câu hỏi' }, { status: 404 });
     const userId = (session.user as any).id;
     const role = (session.user as any).role;
     if (role !== 'admin' && q.createdBy !== userId) return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
 
     const body = await req.json();
     const [updated] = await db.update(questions).set({
-      type: body.type, subject: body.subject, grade: body.grade,
-      content: body.content, imageUrl: body.imageUrl,
-      options: body.options, correctAnswer: body.correctAnswer,
-      matchingPairs: body.matchingPairs, explanation: body.explanation,
+      setId: body.setId !== undefined ? (body.setId || null) : q.setId,
+      type: body.type ?? q.type, 
+      subject: body.subject ?? q.subject, 
+      grade: body.grade !== undefined ? (body.grade ? Number(body.grade) : null) : q.grade,
+      content: body.content ?? q.content, 
+      imageUrl: body.imageUrl !== undefined ? body.imageUrl : q.imageUrl,
+      options: body.options ?? q.options, 
+      correctAnswer: body.correctAnswer ?? q.correctAnswer,
+      matchingPairs: body.matchingPairs ?? q.matchingPairs, 
+      explanation: body.explanation ?? q.explanation,
       tags: typeof body.tags === 'string' ? body.tags.split(',').map((t: string) => t.trim()).filter(Boolean) : (body.tags ?? q.tags),
     }).where(eq(questions.id, params.id)).returning();
 
@@ -37,7 +43,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     if (!session?.user) return NextResponse.json({ error: 'Chưa đăng nhập' }, { status: 401 });
 
     const [q] = await db.select().from(questions).where(eq(questions.id, params.id)).limit(1);
-    if (!q) return NextResponse.json({ error: 'Không tìm thấy' }, { status: 404 });
+    if (!q) return NextResponse.json({ error: 'Không tìm thấy câu hỏi' }, { status: 404 });
     const userId = (session.user as any).id;
     const role = (session.user as any).role;
     if (role !== 'admin' && q.createdBy !== userId) return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });

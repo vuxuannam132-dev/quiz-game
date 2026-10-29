@@ -26,6 +26,8 @@ export interface IMatchingPair {
 
 export interface IQuestion {
   _id: string;
+  id?: string;
+  setId?: string;
   createdBy: string | IUser;
   type: QuestionType;
   subject: string;
