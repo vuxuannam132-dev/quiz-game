@@ -50,6 +50,8 @@ export const questions = pgTable('questions', {
 export const rooms = pgTable('rooms', {
   id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
   code: text('code').notNull().unique(),
+  name: text('name').default(''),
+  coverImage: text('cover_image'),
   createdBy: text('created_by').notNull().references(() => users.id, { onDelete: 'cascade' }),
   setId: text('set_id').references(() => questionSets.id),
   questionIds: text('question_ids').array().default([]),
@@ -65,6 +67,7 @@ export const rooms = pgTable('rooms', {
   status: text('status', { enum: ['waiting', 'playing', 'paused', 'finished'] }).notNull().default('waiting'),
   currentQuestionIndex: integer('current_question_index').notNull().default(0),
   questionRevealed: boolean('question_revealed').notNull().default(false),
+  showRanking: boolean('show_ranking').notNull().default(false),
   students: jsonb('students').$type<Array<{ name: string; sessionId: string; joinedAt: string }>>().default([]),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   expiresAt: timestamp('expires_at').notNull(),

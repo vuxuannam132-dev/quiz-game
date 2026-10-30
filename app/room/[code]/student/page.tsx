@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { v4 as uuidv4 } from 'uuid';
 import { useRoomPolling } from '@/hooks/useRoomPolling';
@@ -41,6 +41,7 @@ export default function StudentPage() {
   const [joinError, setJoinError] = useState('');
   const [joining, setJoining] = useState(false);
   const [monitorEnabled, setMonitorEnabled] = useState(false);
+  const questionStartTimeRef = useRef<number>(Date.now());
 
   const { roomState, loading } = useRoomPolling(joined ? code : '', 1500);
   const { leaderboard } = useLeaderboard(code);
@@ -58,11 +59,12 @@ export default function StudentPage() {
     }
   }, [code]);
 
-  // Reset selected answer when question changes
+  // Reset selected answer & record start time when question changes
   const currentQId = (roomState?.currentQuestion as any)?.id || (roomState?.currentQuestion as any)?._id;
   useEffect(() => {
     setSelectedAnswer(undefined);
     setAnswerResult(null);
+    questionStartTimeRef.current = Date.now();
   }, [currentQId, roomState?.currentQuestionIndex]);
 
   const doJoin = async (name: string, sid: string) => {
@@ -101,6 +103,8 @@ export default function StudentPage() {
     setSelectedAnswer(answer);
     setSubmitting(true);
 
+    const timeSpent = Math.max(0.1, Number(((Date.now() - questionStartTimeRef.current) / 1000).toFixed(2)));
+
     try {
       const questionId = (roomState.currentQuestion as any).id || (roomState.currentQuestion as any)._id;
       const res = await fetch('/api/answer', {
@@ -111,7 +115,7 @@ export default function StudentPage() {
           sessionId,
           questionId,
           answer,
-          timeSpent: 0,
+          timeSpent,
           tabSwitchCount,
         }),
       });
@@ -275,8 +279,27 @@ export default function StudentPage() {
         </div>
       )}
 
-      {/* When Revealed: Instant feedback */}
-      {roomState?.questionRevealed && (
+      {/* When Showing Ranking: Show my current standing */}
+      {roomState?.showRanking ? (
+        <div className="flex-1 flex flex-col justify-center p-6 text-center animate-bounce-in">
+          <span className="text-6xl mb-3">🏆</span>
+          <h2 className="text-2xl font-black text-brand-yellow mb-1">Bảng Xếp Hạng Vòng Này</h2>
+          <p className="text-slate-400 text-xs mb-4">Điểm số và thứ hạng của bạn</p>
+          {(() => {
+            const myRank = leaderboard.find((e) => e.studentName === studentName);
+            return (
+              <div className="bg-slate-800 border-2 border-slate-700 rounded-3xl p-6 shadow-xl mb-4 max-w-sm mx-auto w-full">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Thứ hạng hiện tại</span>
+                <div className="text-5xl font-black text-brand-yellow mb-2">#{myRank?.rank ?? '-'}</div>
+                <div className="text-2xl font-black text-white">{totalScore.toLocaleString()} pts</div>
+                <p className="text-slate-400 text-xs mt-2">Đúng {myRank?.correctCount ?? 0} câu</p>
+              </div>
+            );
+          })()}
+          <p className="text-slate-400 font-bold text-xs">Hãy nhìn lên màn chiếu của giáo viên để xem toàn lớp!</p>
+        </div>
+      ) : roomState?.questionRevealed ? (
+        /* When Revealed: Instant feedback */
         <div className="flex-1 flex flex-col justify-center p-6 text-center">
           {answerResult ? (
             <ResultFeedback
@@ -293,7 +316,7 @@ export default function StudentPage() {
             </div>
           )}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

@@ -15,9 +15,14 @@ export async function GET(req: NextRequest) {
       .orderBy(desc(rooms.createdAt))
       .limit(50);
 
-    const result = rows.map(r => ({
-      _id: r.id, code: r.code, adminCode: (r as any).adminCode ?? r.code,
-      mode: r.mode, status: r.status,
+    const result = rows.map((r) => ({
+      _id: r.id,
+      code: r.code,
+      name: r.name || '',
+      coverImage: r.coverImage || null,
+      adminCode: (r as any).adminCode ?? r.code,
+      mode: r.mode,
+      status: r.status,
       studentsCount: (r.students as any[])?.length ?? 0,
       questionCount: r.questionIds?.length ?? 0,
       createdAt: r.createdAt,
@@ -25,6 +30,6 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ rooms: result });
   } catch (e: any) {
-    return NextResponse.json({ error: 'Lỗi lấy phòng' }, { status: 500 });
+    return NextResponse.json({ error: 'Lỗi lấy phòng: ' + e.message }, { status: 500 });
   }
 }

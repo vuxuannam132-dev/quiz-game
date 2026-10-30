@@ -8,9 +8,10 @@ interface TimerProps {
   onTimeUp: () => void;
   isRunning: boolean;
   onTick?: (remaining: number) => void;
+  resetKey?: any;
 }
 
-export function Timer({ timeLimit, onTimeUp, isRunning, onTick }: TimerProps) {
+export function Timer({ timeLimit, onTimeUp, isRunning, onTick, resetKey }: TimerProps) {
   const [remaining, setRemaining] = useState(timeLimit);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const onTimeUpRef = useRef(onTimeUp);
@@ -19,9 +20,13 @@ export function Timer({ timeLimit, onTimeUp, isRunning, onTick }: TimerProps) {
   useEffect(() => { onTimeUpRef.current = onTimeUp; }, [onTimeUp]);
   useEffect(() => { onTickRef.current = onTick; }, [onTick]);
 
+  // Reset to timeLimit whenever timeLimit or resetKey changes
   useEffect(() => {
     setRemaining(timeLimit);
-  }, [timeLimit]);
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+    }
+  }, [timeLimit, resetKey]);
 
   useEffect(() => {
     if (!isRunning) {
@@ -29,12 +34,17 @@ export function Timer({ timeLimit, onTimeUp, isRunning, onTick }: TimerProps) {
       return;
     }
 
+    // If remaining was already 0 when resumed/started, reset to timeLimit
+    setRemaining((prev) => (prev <= 0 ? timeLimit : prev));
+
+    if (intervalRef.current) clearInterval(intervalRef.current);
+
     intervalRef.current = setInterval(() => {
       setRemaining((prev) => {
         const next = prev - 1;
         onTickRef.current?.(next);
         if (next <= 0) {
-          clearInterval(intervalRef.current!);
+          if (intervalRef.current) clearInterval(intervalRef.current);
           onTimeUpRef.current();
           return 0;
         }
@@ -45,7 +55,7 @@ export function Timer({ timeLimit, onTimeUp, isRunning, onTick }: TimerProps) {
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [isRunning]);
+  }, [isRunning, resetKey, timeLimit]);
 
   const percentage = (remaining / timeLimit) * 100;
   const isUrgent = remaining <= 5;
@@ -58,19 +68,19 @@ export function Timer({ timeLimit, onTimeUp, isRunning, onTick }: TimerProps) {
     : '#22c55e';
 
   return (
-    <div className="flex flex-col items-center gap-2">
+    <div className="flex flex-col items-center gap-1">
       <motion.div
-        animate={isUrgent ? { scale: [1, 1.1, 1] } : {}}
+        animate={isUrgent ? { scale: [1, 1.12, 1] } : {}}
         transition={{ repeat: Infinity, duration: 0.5 }}
-        className="relative w-20 h-20"
+        className="relative w-16 h-16 sm:w-20 sm:h-20"
       >
-        <svg className="w-20 h-20 -rotate-90" viewBox="0 0 80 80">
+        <svg className="w-full h-full -rotate-90" viewBox="0 0 80 80">
           <circle
             cx="40"
             cy="40"
             r="34"
             fill="none"
-            stroke="rgba(255,255,255,0.1)"
+            stroke="rgba(0,0,0,0.08)"
             strokeWidth="8"
           />
           <circle
@@ -87,13 +97,13 @@ export function Timer({ timeLimit, onTimeUp, isRunning, onTick }: TimerProps) {
           />
         </svg>
         <div
-          className="absolute inset-0 flex items-center justify-center text-2xl font-bold"
+          className="absolute inset-0 flex items-center justify-center text-xl sm:text-2xl font-black font-mono"
           style={{ color }}
         >
           {remaining}
         </div>
       </motion.div>
-      <div className="text-xs text-gray-400">giây</div>
+      <div className="text-[10px] font-black uppercase text-slate-400">giây</div>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-const IMGBB_API_KEY = process.env.IMGBB_API_KEY;
+const IMGBB_API_KEY = process.env.IMGBB_API_KEY || '8b966050a1e124f10fc05a3ecec46adc';
 const IMGBB_UPLOAD_URL = 'https://api.imgbb.com/1/upload';
 
 export async function uploadToImgBB(buffer: Buffer, fileName?: string): Promise<string> {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { LeaderboardEntry, UseLeaderboardReturn } from '@/types';
 
 export function useLeaderboard(roomCode: string): UseLeaderboardReturn {
@@ -11,10 +11,10 @@ export function useLeaderboard(roomCode: string): UseLeaderboardReturn {
     if (!roomCode) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/leaderboard/${roomCode}`);
+      const res = await fetch(`/api/leaderboard/${roomCode}`, { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
-        setLeaderboard(data);
+        setLeaderboard(Array.isArray(data) ? data : []);
       }
     } catch (error) {
       console.error('Failed to fetch leaderboard:', error);
@@ -22,6 +22,10 @@ export function useLeaderboard(roomCode: string): UseLeaderboardReturn {
       setLoading(false);
     }
   }, [roomCode]);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
 
   return { leaderboard, loading, refresh };
 }

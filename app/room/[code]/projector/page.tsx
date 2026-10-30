@@ -16,11 +16,11 @@ export default function ProjectorPage() {
   const { play } = useSound(soundEnabled);
 
   useEffect(() => {
-    if (roomState?.questionRevealed) {
+    if (roomState?.questionRevealed || roomState?.showRanking) {
       play('reveal');
       refreshLeaderboard();
     }
-  }, [roomState?.questionRevealed]);
+  }, [roomState?.questionRevealed, roomState?.showRanking]);
 
   useEffect(() => {
     if (roomState?.status === 'finished') {

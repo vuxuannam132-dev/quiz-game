@@ -9,6 +9,8 @@ import { QRCodeSVG } from 'qrcode.react';
 interface Room {
   _id: string;
   code: string;
+  name?: string;
+  coverImage?: string;
   mode: string;
   status: string;
   studentsCount: number;
@@ -131,7 +133,7 @@ export default function RoomsPage() {
 
               <div>
                 <div className="flex items-center justify-center sm:justify-start gap-2 text-green-700 font-black text-lg">
-                  <span>🎉</span> Phòng đã sẵn sàng!
+                  <span>🎉</span> Phòng {createdRoom.name ? `"${createdRoom.name}"` : 'mới'} đã sẵn sàng!
                 </div>
                 <p className="text-slate-600 text-sm mt-1">
                   Chiếu mã PIN hoặc mã QR lên bảng cho học sinh tham gia.
@@ -218,9 +220,25 @@ export default function RoomsPage() {
                   return (
                     <tr key={room._id} className="hover:bg-slate-50/80 transition-colors">
                       <td className="px-6 py-4">
-                        <span className="font-mono font-black text-2xl text-slate-900 tracking-wider">
-                          {room.code}
-                        </span>
+                        <div className="flex items-center gap-3">
+                          {room.coverImage && (
+                            <img
+                              src={room.coverImage}
+                              alt="Ảnh phòng"
+                              className="w-12 h-12 rounded-xl object-cover border border-slate-200 shrink-0"
+                            />
+                          )}
+                          <div>
+                            {room.name && (
+                              <p className="font-black text-sm text-slate-800 line-clamp-1 max-w-[220px]">
+                                {room.name}
+                              </p>
+                            )}
+                            <span className="font-mono font-black text-2xl text-slate-900 tracking-wider">
+                              {room.code}
+                            </span>
+                          </div>
+                        </div>
                       </td>
                       <td className="px-6 py-4 text-sm font-bold text-slate-700 capitalize">
                         {room.mode === 'exam' ? '🏆 Thi đấu' : room.mode === 'practice' ? '⚡ Luyện tập' : '📚 Học tập'}

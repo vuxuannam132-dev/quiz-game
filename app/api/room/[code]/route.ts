@@ -5,15 +5,13 @@ import { db } from '@/lib/db';
 import { rooms, questions, gameSessions } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 import { getRoomStateFromCache, setRoomStateInCache, invalidateRoomCache } from '@/lib/redis';
+import { RoundStats } from '@/types';
 
 export async function GET(req: NextRequest, { params }: { params: { code: string } }) {
   try {
     const code = params.code.toUpperCase().trim();
 
-    // Try cache first
-    const cached = await getRoomStateFromCache(code);
-    if (cached) return NextResponse.json(cached);
-
+    // Query room directly for accurate real-time state
     const [room] = await db.select().from(rooms).where(eq(rooms.code, code)).limit(1);
     if (!room) return NextResponse.json({ error: 'Phòng không tồn tại' }, { status: 404 });
 
@@ -24,25 +22,68 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
       if (q) {
         if (!room.questionRevealed) {
           const { correctAnswer, matchingPairs, ...rest } = q;
-          currentQuestion = rest;
+          currentQuestion = { ...rest, id: q.id, _id: q.id };
         } else {
-          currentQuestion = q;
+          currentQuestion = { ...q, id: q.id, _id: q.id };
         }
       }
     }
 
+    // Compute round statistics if question is revealed or showing ranking
+    let roundStats: RoundStats | undefined;
+    if ((room.questionRevealed || room.showRanking) && currentQuestion) {
+      const qId = (currentQuestion as any).id;
+      const sessions = await db.select({ answers: gameSessions.answers })
+        .from(gameSessions)
+        .where(eq(gameSessions.roomCode, code));
+
+      let totalAnswered = 0;
+      let correctCount = 0;
+      let wrongCount = 0;
+      const optionCounts: Record<string, number> = { A: 0, B: 0, C: 0, D: 0 };
+
+      sessions.forEach((s) => {
+        const answers = (s.answers ?? []) as Array<{ questionId: string; answer: string; correct: boolean }>;
+        const ans = answers.find((a) => a.questionId === qId);
+        if (ans) {
+          totalAnswered++;
+          if (ans.correct) correctCount++;
+          else wrongCount++;
+          if (ans.answer) {
+            optionCounts[ans.answer] = (optionCounts[ans.answer] || 0) + 1;
+          }
+        }
+      });
+
+      const percentCorrect = totalAnswered > 0 ? Math.round((correctCount / totalAnswered) * 100) : 0;
+      const percentWrong = totalAnswered > 0 ? 100 - percentCorrect : 0;
+
+      roundStats = {
+        totalAnswered,
+        correctCount,
+        wrongCount,
+        percentCorrect,
+        percentWrong,
+        optionCounts,
+      };
+    }
+
     const state = {
       code: room.code,
+      name: room.name || '',
+      coverImage: room.coverImage || undefined,
       status: room.status,
       mode: room.mode,
       currentQuestionIndex: room.currentQuestionIndex,
       questionRevealed: room.questionRevealed,
+      showRanking: room.showRanking,
       currentQuestion,
       settings: room.settings,
       studentsCount: (room.students as any[])?.length ?? 0,
       totalQuestions: room.questionIds?.length ?? 0,
+      roundStats,
     };
-    await setRoomStateInCache(code, state);
+
     return NextResponse.json(state);
   } catch (e: any) {
     console.error('Error fetching room state:', e);

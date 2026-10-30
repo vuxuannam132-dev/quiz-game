@@ -60,6 +60,8 @@ export interface IRoomStudent {
 export interface IRoom {
   _id: string;
   code: string;
+  name?: string;
+  coverImage?: string;
   adminCode: string;
   createdBy: string | IUser;
   questionIds: string[] | IQuestion[];
@@ -68,6 +70,7 @@ export interface IRoom {
   status: RoomStatus;
   currentQuestionIndex: number;
   questionRevealed: boolean;
+  showRanking?: boolean;
   students: IRoomStudent[];
   createdAt: Date;
   expiresAt: Date;
@@ -94,16 +97,30 @@ export interface IGameSession {
   submittedAt: Date;
 }
 
+export interface RoundStats {
+  totalAnswered: number;
+  correctCount: number;
+  wrongCount: number;
+  percentCorrect: number;
+  percentWrong: number;
+  optionCounts: Record<string, number>;
+}
+
 // API Response types
 export interface RoomStateResponse {
+  code: string;
+  name?: string;
+  coverImage?: string;
   status: RoomStatus;
   mode: RoomMode;
   currentQuestionIndex: number;
   questionRevealed: boolean;
+  showRanking?: boolean;
   currentQuestion: Partial<IQuestion> | null;
   settings: IRoomSettings;
   studentsCount: number;
   totalQuestions: number;
+  roundStats?: RoundStats;
 }
 
 export interface AnswerResponse {
@@ -118,11 +135,15 @@ export interface LeaderboardEntry {
   studentName: string;
   totalScore: number;
   correctCount: number;
+  totalTimeSpent?: number;
 }
 
 export interface CreateRoomResponse {
   code: string;
-  adminCode: string;
+  name?: string;
+  coverImage?: string;
+  adminCode?: string;
+  id?: string;
 }
 
 export interface JoinRoomResponse {

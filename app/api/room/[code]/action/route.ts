@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/authOptions';
 import { db } from '@/lib/db';
-import { rooms, questions } from '@/lib/schema';
+import { rooms, questions, gameSessions } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 import { invalidateRoomCache, setRoomStateInCache } from '@/lib/redis';
+import { RoundStats } from '@/types';
 
-type RoomAction = 'start' | 'next' | 'prev' | 'reveal' | 'pause' | 'resume' | 'finish';
+type RoomAction = 'start' | 'next' | 'prev' | 'reveal' | 'show_ranking' | 'ranking' | 'pause' | 'resume' | 'finish';
 
 export async function POST(req: NextRequest, { params }: { params: { code: string } }) {
   try {
@@ -31,18 +32,22 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
 
     switch (action) {
       case 'start':
-        update = { status: 'playing', currentQuestionIndex: 0, questionRevealed: false };
+        update = { status: 'playing', currentQuestionIndex: 0, questionRevealed: false, showRanking: false };
         break;
       case 'next':
         if (room.currentQuestionIndex >= total - 1) return NextResponse.json({ error: 'Đã là câu hỏi cuối' }, { status: 400 });
-        update = { currentQuestionIndex: room.currentQuestionIndex + 1, questionRevealed: false };
+        update = { currentQuestionIndex: room.currentQuestionIndex + 1, questionRevealed: false, showRanking: false };
         break;
       case 'prev':
         if (room.currentQuestionIndex <= 0) return NextResponse.json({ error: 'Đã là câu hỏi đầu' }, { status: 400 });
-        update = { currentQuestionIndex: room.currentQuestionIndex - 1, questionRevealed: false };
+        update = { currentQuestionIndex: room.currentQuestionIndex - 1, questionRevealed: false, showRanking: false };
         break;
       case 'reveal':
-        update = { questionRevealed: true };
+        update = { questionRevealed: true, showRanking: false };
+        break;
+      case 'show_ranking':
+      case 'ranking':
+        update = { showRanking: true };
         break;
       case 'pause':
         update = { status: 'paused' };
@@ -51,7 +56,7 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
         update = { status: 'playing' };
         break;
       case 'finish':
-        update = { status: 'finished' };
+        update = { status: 'finished', showRanking: false };
         break;
       default:
         return NextResponse.json({ error: 'Action không hợp lệ' }, { status: 400 });
@@ -67,24 +72,67 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
       if (q) {
         if (!updated.questionRevealed) {
           const { correctAnswer, matchingPairs, ...rest } = q;
-          currentQuestion = rest;
+          currentQuestion = { ...rest, id: q.id, _id: q.id };
         } else {
-          currentQuestion = q;
+          currentQuestion = { ...q, id: q.id, _id: q.id };
         }
       }
     }
 
+    let roundStats: RoundStats | undefined;
+    if ((updated.questionRevealed || updated.showRanking) && currentQuestion) {
+      const qId = (currentQuestion as any).id;
+      const sessions = await db.select({ answers: gameSessions.answers })
+        .from(gameSessions)
+        .where(eq(gameSessions.roomCode, code));
+
+      let totalAnswered = 0;
+      let correctCount = 0;
+      let wrongCount = 0;
+      const optionCounts: Record<string, number> = { A: 0, B: 0, C: 0, D: 0 };
+
+      sessions.forEach((s) => {
+        const answers = (s.answers ?? []) as Array<{ questionId: string; answer: string; correct: boolean }>;
+        const ans = answers.find((a) => a.questionId === qId);
+        if (ans) {
+          totalAnswered++;
+          if (ans.correct) correctCount++;
+          else wrongCount++;
+          if (ans.answer) {
+            optionCounts[ans.answer] = (optionCounts[ans.answer] || 0) + 1;
+          }
+        }
+      });
+
+      const percentCorrect = totalAnswered > 0 ? Math.round((correctCount / totalAnswered) * 100) : 0;
+      const percentWrong = totalAnswered > 0 ? 100 - percentCorrect : 0;
+
+      roundStats = {
+        totalAnswered,
+        correctCount,
+        wrongCount,
+        percentCorrect,
+        percentWrong,
+        optionCounts,
+      };
+    }
+
     const newState = {
       code: updated.code,
+      name: updated.name || '',
+      coverImage: updated.coverImage || undefined,
       status: updated.status,
       mode: updated.mode,
       currentQuestionIndex: updated.currentQuestionIndex,
       questionRevealed: updated.questionRevealed,
+      showRanking: updated.showRanking,
       currentQuestion,
       settings: updated.settings,
       studentsCount: (updated.students as any[])?.length ?? 0,
       totalQuestions: total,
+      roundStats,
     };
+
     await setRoomStateInCache(code, newState);
     return NextResponse.json(newState);
   } catch (e: any) {

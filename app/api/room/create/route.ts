@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
     if (!session?.user) return NextResponse.json({ error: 'Chưa đăng nhập' }, { status: 401 });
 
     const body = await req.json();
-    const { questionIds, setId, mode, settings } = body;
+    const { name, coverImage, questionIds, setId, mode, settings } = body;
     if (!questionIds?.length) return NextResponse.json({ error: 'Vui lòng chọn ít nhất một câu hỏi' }, { status: 400 });
 
     const code = await uniqueCode();
@@ -38,6 +38,8 @@ export async function POST(req: NextRequest) {
 
     const [newRoom] = await db.insert(rooms).values({
       code,
+      name: name?.trim() || '',
+      coverImage: coverImage || null,
       createdBy: (session.user as any).id,
       setId: setId ?? null,
       questionIds,
@@ -46,21 +48,31 @@ export async function POST(req: NextRequest) {
       status: 'waiting',
       currentQuestionIndex: 0,
       questionRevealed: false,
+      showRanking: false,
       students: [],
       expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
     }).returning();
 
     await setRoomStateInCache(code, {
+      code,
+      name: newRoom.name || '',
+      coverImage: newRoom.coverImage || undefined,
       status: 'waiting',
       mode: mode || 'learning',
       currentQuestionIndex: 0,
       questionRevealed: false,
+      showRanking: false,
       settings: roomSettings,
       studentsCount: 0,
       totalQuestions: questionIds.length,
     });
 
-    return NextResponse.json({ code: newRoom.code, id: newRoom.id }, { status: 201 });
+    return NextResponse.json({
+      code: newRoom.code,
+      id: newRoom.id,
+      name: newRoom.name,
+      coverImage: newRoom.coverImage,
+    }, { status: 201 });
   } catch (e: any) {
     console.error('Create room error:', e);
     return NextResponse.json({ error: 'Lỗi tạo phòng: ' + e.message }, { status: 500 });

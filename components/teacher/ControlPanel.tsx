@@ -24,7 +24,7 @@ export function ControlPanel({ roomState, roomCode, onAction }: ControlPanelProp
     }
   };
 
-  const { status, currentQuestionIndex, questionRevealed, totalQuestions, mode } = roomState;
+  const { status, currentQuestionIndex, questionRevealed, showRanking, totalQuestions, mode } = roomState;
   const isLast = currentQuestionIndex >= totalQuestions - 1;
 
   return (
@@ -61,7 +61,7 @@ export function ControlPanel({ roomState, roomCode, onAction }: ControlPanelProp
           />
         )}
 
-        {/* Reveal answer */}
+        {/* Reveal answer button */}
         {status === 'playing' && !questionRevealed && (
           <Button
             onClick={() => handleAction('reveal')}
@@ -72,17 +72,38 @@ export function ControlPanel({ roomState, roomCode, onAction }: ControlPanelProp
           />
         )}
 
-        {/* Next question */}
-        {(status === 'playing' || status === 'paused') && questionRevealed && !isLast && (
+        {/* When Question is Revealed: Option 1 (Show Ranking) or Option 2 (Next Question) */}
+        {(status === 'playing' || status === 'paused') && questionRevealed && !showRanking && (
+          <div className="space-y-2.5">
+            <Button
+              onClick={() => handleAction('show_ranking')}
+              loading={loading === 'show_ranking'}
+              variant="ranking"
+              icon="📊"
+              label="Xem Thống kê & Bảng xếp hạng"
+            />
+            <Button
+              onClick={() => handleAction(isLast ? 'finish' : 'next')}
+              loading={loading === (isLast ? 'finish' : 'next')}
+              variant={isLast ? 'finish' : 'nextSecondary'}
+              icon={isLast ? '🏆' : '⏭️'}
+              label={isLast ? 'Kết thúc & Trao giải' : 'Câu tiếp theo (Bỏ qua BXH)'}
+            />
+          </div>
+        )}
+
+        {/* When Currently Showing Ranking: Button to advance to next question or finish */}
+        {(status === 'playing' || status === 'paused') && showRanking && (
           <Button
-            onClick={() => handleAction('next')}
-            loading={loading === 'next'}
-            variant="next"
-            icon="⏭"
-            label="Câu tiếp theo"
+            onClick={() => handleAction(isLast ? 'finish' : 'next')}
+            loading={loading === (isLast ? 'finish' : 'next')}
+            variant={isLast ? 'finish' : 'next'}
+            icon={isLast ? '🏆' : '⏭️'}
+            label={isLast ? 'Kết thúc & Bảng Vàng Vinh Danh' : 'Sang câu tiếp theo'}
           />
         )}
 
+        {/* Secondary controls row */}
         <div className="flex flex-wrap sm:flex-nowrap gap-2 pt-1">
           {/* Previous question */}
           {(status === 'playing' || status === 'paused') && currentQuestionIndex > 0 && (
@@ -108,11 +129,11 @@ export function ControlPanel({ roomState, roomCode, onAction }: ControlPanelProp
             </button>
           )}
 
-          {/* Finish */}
-          {(status === 'playing' || status === 'paused') && (
+          {/* Emergency finish button */}
+          {(status === 'playing' || status === 'paused') && !isLast && (
             <button
               onClick={() => {
-                if (window.confirm('Bạn có chắc muốn kết thúc phòng chơi này?')) {
+                if (window.confirm('Bạn có chắc muốn kết thúc phòng chơi này ngay lập tức?')) {
                   handleAction('finish');
                 }
               }}
@@ -120,7 +141,7 @@ export function ControlPanel({ roomState, roomCode, onAction }: ControlPanelProp
               className="btn-liquid flex-1 py-3 px-4 rounded-2xl bg-red-50 hover:bg-red-100 text-brand-red font-bold text-sm transition-all flex items-center justify-center gap-1.5 border border-red-200"
             >
               {loading === 'finish' ? <span className="animate-spin">⟳</span> : <span>🏁</span>}
-              <span>Kết thúc</span>
+              <span>Kết thúc sớm</span>
             </button>
           )}
         </div>
@@ -145,7 +166,7 @@ export function ControlPanel({ roomState, roomCode, onAction }: ControlPanelProp
             'bg-blue-100 text-brand-blue border-blue-200'
           }`}>
             {status === 'waiting' ? 'Chờ bắt đầu' :
-             status === 'playing' ? 'Đang chơi' :
+             status === 'playing' ? (showRanking ? 'Đang hiện BXH vòng' : questionRevealed ? 'Đã công bố đáp án' : 'Đang làm bài') :
              status === 'paused' ? 'Tạm dừng' : 'Đã kết thúc'}
           </span>
         </div>
@@ -157,7 +178,7 @@ export function ControlPanel({ roomState, roomCode, onAction }: ControlPanelProp
 interface ButtonProps {
   onClick: () => void;
   loading: boolean;
-  variant: 'start' | 'resume' | 'reveal' | 'next';
+  variant: 'start' | 'resume' | 'reveal' | 'ranking' | 'next' | 'nextSecondary' | 'finish';
   icon: string;
   label: string;
 }
@@ -167,7 +188,10 @@ function Button({ onClick, loading, variant, icon, label }: ButtonProps) {
     start: 'bg-brand-red hover:bg-red-600 text-white shadow-button-3d',
     resume: 'bg-brand-green hover:bg-green-600 text-white shadow-button-3d',
     reveal: 'bg-brand-yellow hover:bg-amber-500 text-slate-900 shadow-button-3d',
-    next: 'bg-brand-blue hover:bg-blue-600 text-white shadow-button-3d',
+    ranking: 'bg-brand-blue hover:bg-blue-600 text-white shadow-button-3d',
+    next: 'bg-brand-red hover:bg-red-600 text-white shadow-button-3d',
+    nextSecondary: 'bg-slate-100 hover:bg-slate-200 text-slate-800 border-2 border-slate-200',
+    finish: 'bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-slate-950 font-black shadow-button-3d',
   };
 
   return (
@@ -176,8 +200,8 @@ function Button({ onClick, loading, variant, icon, label }: ButtonProps) {
       onClick={onClick}
       disabled={loading}
       className={`
-        w-full btn-liquid flex items-center justify-center gap-3 py-4 px-6
-        rounded-2xl font-black text-xl
+        w-full btn-liquid flex items-center justify-center gap-3 py-3.5 px-6
+        rounded-2xl font-black text-base sm:text-lg
         ${styles[variant]}
         disabled:opacity-50 disabled:cursor-not-allowed
         transition-all

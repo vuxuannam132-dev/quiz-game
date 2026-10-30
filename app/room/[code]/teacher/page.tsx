@@ -32,7 +32,7 @@ export default function TeacherPage() {
       }
 
       await refresh();
-      if (action === 'reveal' || action === 'finish') {
+      if (action === 'reveal' || action === 'finish' || action === 'show_ranking' || action === 'ranking' || action === 'next') {
         refreshLB();
       }
     } catch {
@@ -96,7 +96,7 @@ export default function TeacherPage() {
           <div className="flex items-center gap-4">
             <div>
               <span className="text-[11px] font-black uppercase tracking-wider text-slate-400 block">
-                Phòng thi đấu Studio
+                {roomState.name ? `Studio • ${roomState.name}` : 'Phòng thi đấu Studio'}
               </span>
               <div className="flex items-center gap-3">
                 <span className="text-3xl font-black font-mono text-slate-900 tracking-wider">
