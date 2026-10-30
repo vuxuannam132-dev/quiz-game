@@ -1,19 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { gameSessions } from '@/lib/schema';
+import { rooms, gameSessions } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 import { LeaderboardEntry } from '@/types';
 
 export async function GET(req: NextRequest, { params }: { params: { code: string } }) {
   try {
     const code = params.code.toUpperCase().trim();
-    const sessions = await db.select().from(gameSessions)
-      .where(eq(gameSessions.roomCode, code));
+    const [room] = await db.select().from(rooms).where(eq(rooms.code, code)).limit(1);
+    const sessions = await db.select().from(gameSessions).where(eq(gameSessions.roomCode, code));
 
-    const activeSessions = sessions.filter((s) => !s.disqualified);
+    // Map existing sessions
+    const playerMap = new Map<string, {
+      studentName: string;
+      totalScore: number;
+      correctCount: number;
+      totalTimeSpent: number;
+      submittedAt: number;
+      disqualified?: boolean;
+    }>();
 
-    // Compute metrics for each player
-    const mapped = activeSessions.map((s) => {
+    sessions.forEach((s) => {
       const answers = (s.answers ?? []) as Array<{
         questionId: string;
         answer: string;
@@ -24,15 +31,36 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
 
       const correctCount = answers.filter((a) => a.correct).length;
       const totalTimeSpent = answers.reduce((acc, a) => acc + (Number(a.timeSpent) || 0), 0);
+      const score = Number(s.totalScore) || 0;
 
-      return {
-        studentName: s.studentName,
-        totalScore: s.totalScore || 0,
-        correctCount,
-        totalTimeSpent: Number(totalTimeSpent.toFixed(2)),
-        submittedAt: s.submittedAt ? new Date(s.submittedAt).getTime() : 0,
-      };
+      const existing = playerMap.get(s.studentName);
+      if (!existing || score > existing.totalScore) {
+        playerMap.set(s.studentName, {
+          studentName: s.studentName,
+          totalScore: score,
+          correctCount,
+          totalTimeSpent: Number(totalTimeSpent.toFixed(2)),
+          submittedAt: s.submittedAt ? new Date(s.submittedAt).getTime() : 0,
+          disqualified: s.disqualified,
+        });
+      }
     });
+
+    // Also include any students in room.students who may not have a session yet
+    const studentsInRoom = (room?.students ?? []) as Array<{ name: string; sessionId: string }>;
+    studentsInRoom.forEach((stu) => {
+      if (stu.name && !playerMap.has(stu.name)) {
+        playerMap.set(stu.name, {
+          studentName: stu.name,
+          totalScore: 0,
+          correctCount: 0,
+          totalTimeSpent: 0,
+          submittedAt: 0,
+        });
+      }
+    });
+
+    const mapped = Array.from(playerMap.values());
 
     // Sort: 1) totalScore DESC, 2) totalTimeSpent ASC (tie-break), 3) submittedAt ASC
     mapped.sort((a, b) => {

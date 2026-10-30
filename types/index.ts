@@ -121,6 +121,11 @@ export interface RoomStateResponse {
   studentsCount: number;
   totalQuestions: number;
   roundStats?: RoundStats;
+  teacherInfo?: {
+    correctAnswer?: string | null;
+    explanation?: string | null;
+    matchingPairs?: any;
+  };
 }
 
 export interface AnswerResponse {

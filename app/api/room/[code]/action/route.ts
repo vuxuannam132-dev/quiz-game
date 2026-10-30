@@ -66,10 +66,16 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
     await invalidateRoomCache(code);
 
     let currentQuestion = null;
+    let teacherInfo: { correctAnswer?: string | null; explanation?: string | null; matchingPairs?: any } | undefined;
     if (updated.questionIds && updated.questionIds.length > 0 && updated.currentQuestionIndex < updated.questionIds.length) {
       const qId = updated.questionIds[updated.currentQuestionIndex];
       const [q] = await db.select().from(questions).where(eq(questions.id, qId)).limit(1);
       if (q) {
+        teacherInfo = {
+          correctAnswer: q.correctAnswer || null,
+          explanation: q.explanation || null,
+          matchingPairs: q.matchingPairs || null,
+        };
         if (!updated.questionRevealed) {
           const { correctAnswer, matchingPairs, ...rest } = q;
           currentQuestion = { ...rest, id: q.id, _id: q.id };
@@ -131,6 +137,7 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
       studentsCount: (updated.students as any[])?.length ?? 0,
       totalQuestions: total,
       roundStats,
+      teacherInfo,
     };
 
     await setRoomStateInCache(code, newState);

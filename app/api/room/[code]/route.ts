@@ -15,11 +15,24 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
     const [room] = await db.select().from(rooms).where(eq(rooms.code, code)).limit(1);
     if (!room) return NextResponse.json({ error: 'Phòng không tồn tại' }, { status: 404 });
 
+    const session = await getServerSession(authOptions);
+    const isTeacher = !!session?.user;
+
     let currentQuestion = null;
+    let teacherInfo: { correctAnswer?: string | null; explanation?: string | null; matchingPairs?: any } | undefined;
+
     if (room.questionIds && room.questionIds.length > 0 && room.currentQuestionIndex < room.questionIds.length) {
       const qId = room.questionIds[room.currentQuestionIndex];
       const [q] = await db.select().from(questions).where(eq(questions.id, qId)).limit(1);
       if (q) {
+        if (isTeacher) {
+          teacherInfo = {
+            correctAnswer: q.correctAnswer || null,
+            explanation: q.explanation || null,
+            matchingPairs: q.matchingPairs || null,
+          };
+        }
+
         if (!room.questionRevealed) {
           const { correctAnswer, matchingPairs, ...rest } = q;
           currentQuestion = { ...rest, id: q.id, _id: q.id };
@@ -82,6 +95,7 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
       studentsCount: (room.students as any[])?.length ?? 0,
       totalQuestions: room.questionIds?.length ?? 0,
       roundStats,
+      teacherInfo,
     };
 
     return NextResponse.json(state);

@@ -94,8 +94,11 @@ export default function StudentPage() {
   const handleNameSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (nameInput.trim().length < 2) return;
+    const activeSid = sessionId || localStorage.getItem(`sessionId_${code}`) || uuidv4();
+    localStorage.setItem(`sessionId_${code}`, activeSid);
+    setSessionId(activeSid);
     setStudentName(nameInput.trim());
-    doJoin(nameInput.trim(), sessionId);
+    doJoin(nameInput.trim(), activeSid);
   };
 
   const handleAnswer = useCallback(async (answer: string) => {
@@ -104,6 +107,7 @@ export default function StudentPage() {
     setSubmitting(true);
 
     const timeSpent = Math.max(0.1, Number(((Date.now() - questionStartTimeRef.current) / 1000).toFixed(2)));
+    const activeSid = sessionId || (typeof window !== 'undefined' ? localStorage.getItem(`sessionId_${code}`) : '') || '';
 
     try {
       const questionId = (roomState.currentQuestion as any).id || (roomState.currentQuestion as any)._id;
@@ -112,7 +116,7 @@ export default function StudentPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           roomCode: code,
-          sessionId,
+          sessionId: activeSid,
           questionId,
           answer,
           timeSpent,
@@ -147,7 +151,7 @@ export default function StudentPage() {
   }, [play]);
 
   useTabMonitor({
-    enabled: joined && (roomMode === 'exam' || (roomMode === 'practice' && monitorEnabled)),
+    enabled: joined && !!roomState?.settings?.monitorTabSwitch,
     onSwitch: handleTabSwitch,
     onDisqualify: handleDisqualify,
     maxSwitches: roomState?.settings?.maxTabSwitches || 3,

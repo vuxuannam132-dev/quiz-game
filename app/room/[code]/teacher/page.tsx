@@ -184,7 +184,15 @@ export default function TeacherPage() {
             </div>
 
             {/* Secret Teacher Cheat-Sheet / Correct Answer Indicator */}
-            {currentQ && (
+            {roomState.status === 'finished' ? (
+              <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-200 text-center">
+                <span className="text-3xl block mb-1">🏁</span>
+                <h4 className="font-black text-slate-800 text-lg">Trận đấu đã kết thúc</h4>
+                <p className="text-xs text-slate-500 mt-1 font-semibold">
+                  Toàn bộ kết quả và Bảng Vàng Vinh Danh đã hiển thị trên màn chiếu.
+                </p>
+              </div>
+            ) : currentQ ? (
               <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-200">
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-xs font-black uppercase tracking-wider text-slate-400">
@@ -201,24 +209,32 @@ export default function TeacherPage() {
                   )}
                 </div>
 
-                <div className="p-3 bg-green-50 rounded-2xl border border-green-200 mb-3">
-                  <span className="text-xs font-bold text-green-800 uppercase block mb-0.5">
-                    Đáp án đúng:
-                  </span>
-                  <p className="text-base font-black text-green-900">
-                    ⭐ {currentQ.correctAnswer}: {
-                      currentQ.options?.find((o) => o.key === currentQ.correctAnswer)?.text || currentQ.correctAnswer
-                    }
-                  </p>
-                </div>
+                {(() => {
+                  const correctKey = roomState.teacherInfo?.correctAnswer || currentQ.correctAnswer;
+                  const optText = currentQ.options?.find((o) => o.key === correctKey)?.text;
+                  const explanationText = roomState.teacherInfo?.explanation || currentQ.explanation;
+                  return (
+                    <>
+                      <div className="p-3.5 bg-green-50 rounded-2xl border-2 border-green-200 mb-3 shadow-sm">
+                        <span className="text-xs font-bold text-green-800 uppercase block mb-1">
+                          Đáp án đúng:
+                        </span>
+                        <p className="text-base font-black text-green-900 leading-snug break-words whitespace-normal">
+                          ⭐ <span className="text-brand-red font-black text-lg mr-1">{correctKey || 'Đang tải...'}</span>
+                          {optText ? ` - ${optText}` : ''}
+                        </p>
+                      </div>
 
-                {currentQ.explanation && (
-                  <p className="text-xs text-slate-600 italic bg-slate-50 p-3 rounded-xl border border-slate-200">
-                    💡 <strong>Ghi chú giải thích:</strong> {currentQ.explanation}
-                  </p>
-                )}
+                      {explanationText && (
+                        <p className="text-xs text-slate-700 italic bg-amber-50/60 p-3 rounded-xl border border-amber-200">
+                          💡 <strong>Ghi chú giải thích:</strong> {explanationText}
+                        </p>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
-            )}
+            ) : null}
           </div>
 
           {/* RIGHT 5 COLS: CONTROLS & LEADERBOARD */}

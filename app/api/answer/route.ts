@@ -19,22 +19,39 @@ export async function POST(req: NextRequest) {
     const correct = isAnswerCorrect(question.type, answer, question.correctAnswer ?? '', question.matchingPairs ?? undefined);
     const points = calculateScore({ correct, timeSpent: timeSpent ?? 0, timeLimit: room.settings?.timeLimit ?? undefined });
 
-    const [session] = await db.select().from(gameSessions)
+    let [session] = await db.select().from(gameSessions)
       .where(and(eq(gameSessions.roomCode, roomCode.toUpperCase()), eq(gameSessions.sessionId, sessionId)))
       .limit(1);
-    if (!session) return NextResponse.json({ error: 'Phiên không tồn tại' }, { status: 404 });
+
+    if (!session) {
+      // Auto-upsert session so student's answer is NEVER lost due to session drop
+      const studentInRoom = (room.students as any[])?.find((s: any) => s.sessionId === sessionId);
+      const studentName = studentInRoom?.name || 'Học sinh';
+      const [newSession] = await db.insert(gameSessions).values({
+        id: crypto.randomUUID(),
+        roomCode: roomCode.toUpperCase(),
+        studentName,
+        sessionId,
+        answers: [],
+        totalScore: 0,
+        tabSwitchCount: 0,
+        disqualified: false,
+        submittedAt: new Date(),
+      }).returning();
+      session = newSession;
+    }
 
     const answers = (session.answers ?? []) as Array<{ questionId: string; answer: string; correct: boolean; timeSpent: number; points: number }>;
     const alreadyAnswered = answers.find(a => a.questionId === questionId);
 
     if (!alreadyAnswered) {
       answers.push({ questionId, answer, correct, timeSpent: timeSpent ?? 0, points });
-      const newTotal = session.totalScore + points;
+      const newTotal = (session.totalScore || 0) + points;
       let updateData: any = { answers, totalScore: newTotal, submittedAt: new Date() };
 
       if (tabSwitchCount !== undefined) {
         updateData.tabSwitchCount = tabSwitchCount;
-        if (room.mode === 'exam' && room.settings?.monitorTabSwitch && tabSwitchCount >= (room.settings?.maxTabSwitches ?? 3)) {
+        if (room.settings?.monitorTabSwitch && tabSwitchCount >= (room.settings?.maxTabSwitches ?? 3)) {
           updateData.disqualified = true;
           updateData.disqualifiedReason = `Chuyển tab ${tabSwitchCount} lần`;
         }

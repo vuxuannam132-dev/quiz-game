@@ -19,7 +19,7 @@ export default function JoinRoomPage() {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch(`/api/room/${trimmed}/state`);
+      const res = await fetch(`/api/room/${trimmed}`);
       if (!res.ok) {
         setError('Phòng không tồn tại hoặc đã kết thúc');
         return;

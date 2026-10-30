@@ -21,6 +21,193 @@ const KAHOOT_COLORS = [
   { key: 'D', bg: 'bg-[#26890C]', border: 'border-[#1C6609]', shape: '■' },
 ];
 
+interface HorizontalOptionStatsChartProps {
+  roundStats?: any;
+  options?: Array<{ key: string; text: string }>;
+  correctAnswer?: string;
+  isMiniPreview?: boolean;
+  theme?: 'dark' | 'light';
+}
+
+function HorizontalOptionStatsChart({
+  roundStats,
+  options = [],
+  correctAnswer,
+  isMiniPreview = false,
+  theme = 'dark',
+}: HorizontalOptionStatsChartProps) {
+  const totalAns = roundStats?.totalAnswered ?? 0;
+  const pctCorrect = roundStats?.percentCorrect ?? 0;
+  const pctWrong = roundStats?.percentWrong ?? 0;
+  const isDark = theme === 'dark';
+
+  const defaultKeys = options && options.length > 0 ? options.map((o) => o.key) : ['A', 'B', 'C', 'D'];
+
+  return (
+    <div
+      className={`w-full max-w-4xl mx-auto rounded-3xl p-3 sm:p-5 border transition-all ${
+        isDark
+          ? 'bg-slate-900/90 border-slate-800 text-white shadow-xl'
+          : 'bg-white border-slate-200 text-slate-800 shadow-md'
+      }`}
+    >
+      {/* 1. TOP STATS ROW: PERCENTAGES */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 mb-3.5">
+        {/* Correct % Card */}
+        <div
+          className={`p-3 rounded-2xl border-2 flex items-center gap-2.5 ${
+            isDark
+              ? 'bg-green-500/15 border-green-500/40 text-green-300'
+              : 'bg-green-50 border-green-300 text-green-900'
+          }`}
+        >
+          <span className="text-2xl sm:text-3xl">🎯</span>
+          <div>
+            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider block opacity-80">
+              Trả lời đúng
+            </span>
+            <p className={`font-black font-mono leading-none ${isMiniPreview ? 'text-base' : 'text-xl sm:text-2xl'}`}>
+              {pctCorrect}%{' '}
+              <span className="text-xs font-normal opacity-70">
+                ({roundStats?.correctCount ?? 0}/{totalAns})
+              </span>
+            </p>
+          </div>
+        </div>
+
+        {/* Wrong % Card */}
+        <div
+          className={`p-3 rounded-2xl border-2 flex items-center gap-2.5 ${
+            isDark
+              ? 'bg-red-500/15 border-red-500/40 text-red-300'
+              : 'bg-red-50 border-red-300 text-red-900'
+          }`}
+        >
+          <span className="text-2xl sm:text-3xl">💥</span>
+          <div>
+            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider block opacity-80">
+              Trả lời sai
+            </span>
+            <p className={`font-black font-mono leading-none ${isMiniPreview ? 'text-base' : 'text-xl sm:text-2xl'}`}>
+              {pctWrong}%{' '}
+              <span className="text-xs font-normal opacity-70">
+                ({roundStats?.wrongCount ?? 0}/{totalAns})
+              </span>
+            </p>
+          </div>
+        </div>
+
+        {/* Total Answers Card */}
+        <div
+          className={`col-span-2 sm:col-span-1 p-3 rounded-2xl border-2 flex items-center gap-2.5 ${
+            isDark
+              ? 'bg-blue-500/15 border-blue-500/40 text-blue-300'
+              : 'bg-blue-50 border-blue-300 text-blue-900'
+          }`}
+        >
+          <span className="text-2xl sm:text-3xl">👥</span>
+          <div>
+            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider block opacity-80">
+              Tổng lượt chọn
+            </span>
+            <p className={`font-black font-mono leading-none ${isMiniPreview ? 'text-base' : 'text-xl sm:text-2xl'}`}>
+              {totalAns}{' '}
+              <span className="text-xs font-normal opacity-70">phản hồi</span>
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. HORIZONTAL BAR CHART: OPTION DISTRIBUTION */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between px-1 mb-1">
+          <span
+            className={`text-[11px] font-black uppercase tracking-wider ${
+              isDark ? 'text-slate-400' : 'text-slate-500'
+            }`}
+          >
+            📊 Biểu đồ cột ngang phân bố lựa chọn
+          </span>
+          <span className={`text-[11px] font-bold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+            {totalAns > 0 ? `Tổng ${totalAns} lượt` : 'Chưa có phản hồi'}
+          </span>
+        </div>
+
+        {defaultKeys.map((key, idx) => {
+          const opt = options.find((o) => o.key === key);
+          const count = roundStats?.optionCounts?.[key] ?? 0;
+          const pct = totalAns > 0 ? Math.round((count / totalAns) * 100) : 0;
+          const isCorrect = correctAnswer === key;
+          const style = KAHOOT_COLORS[idx % KAHOOT_COLORS.length];
+
+          return (
+            <div
+              key={key}
+              className={`rounded-2xl p-2 sm:p-2.5 border transition-all ${
+                isCorrect
+                  ? isDark
+                    ? 'bg-green-500/20 border-green-400/80 ring-2 ring-green-400/40 shadow-md'
+                    : 'bg-green-50/80 border-green-400 ring-2 ring-green-300 shadow-sm'
+                  : isDark
+                  ? 'bg-slate-800/60 border-slate-700/60'
+                  : 'bg-slate-50 border-slate-200'
+              }`}
+            >
+              <div className="flex items-center justify-between text-xs font-black mb-1.5 px-1">
+                <div className="flex items-center gap-2 truncate mr-2">
+                  <span
+                    className={`w-6 h-6 rounded-lg ${style.bg} text-white flex items-center justify-center text-xs font-black shrink-0 shadow-sm`}
+                  >
+                    {style.shape}
+                  </span>
+                  <span className="font-mono text-sm">{key}</span>
+                  {opt?.text && (
+                    <span
+                      className={`font-semibold truncate max-w-[180px] sm:max-w-md ${
+                        isDark ? 'text-slate-300' : 'text-slate-600'
+                      }`}
+                    >
+                      {opt.text}
+                    </span>
+                  )}
+                  {isCorrect && (
+                    <span className="bg-green-500 text-white text-[10px] font-black uppercase px-2 py-0.5 rounded-full shrink-0 shadow-sm">
+                      ✓ Đáp án đúng
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 font-mono shrink-0">
+                  <span className="font-black text-sm">{count} bạn</span>
+                  <span className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                    ({pct}%)
+                  </span>
+                </div>
+              </div>
+
+              {/* Progress Track & Animated Horizontal Fill Bar */}
+              <div
+                className={`w-full h-3 sm:h-3.5 rounded-full overflow-hidden ${
+                  isDark ? 'bg-slate-950/80' : 'bg-slate-200'
+                }`}
+              >
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${pct}%` }}
+                  transition={{ duration: 0.6, ease: 'easeOut' }}
+                  className={`h-full rounded-full ${
+                    isCorrect ? 'bg-gradient-to-r from-green-500 to-emerald-400' : style.bg
+                  }`}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export function ProjectorView({
   roomState,
   code,
@@ -38,21 +225,26 @@ export function ProjectorView({
   }, [externalLeaderboard]);
 
   useEffect(() => {
-    if (code && (roomState.status === 'finished' || roomState.showRanking || leaderboard.length === 0)) {
+    if (!code) return;
+    const fetchLB = () => {
       fetch(`/api/leaderboard/${code}`, { cache: 'no-store' })
         .then((res) => res.json())
         .then((data) => {
-          if (Array.isArray(data) && data.length > 0) {
+          if (Array.isArray(data)) {
             setLeaderboard(data);
           }
         })
         .catch(() => {});
-    }
+    };
+
+    fetchLB();
+    const interval = setInterval(fetchLB, 2000);
+    return () => clearInterval(interval);
   }, [code, roomState.status, roomState.showRanking, roomState.currentQuestionIndex]);
 
   // Grand celebration confetti for finished screen
   useEffect(() => {
-    if (roomState.status === 'finished' && !confettiFiredRef.current && typeof window !== 'undefined') {
+    if (roomState.status === 'finished' && leaderboard.length > 0 && !confettiFiredRef.current && typeof window !== 'undefined') {
       confettiFiredRef.current = true;
       import('canvas-confetti').then(({ default: confetti }) => {
         // First burst
@@ -79,7 +271,7 @@ export function ProjectorView({
         }, 600);
       });
     }
-  }, [roomState.status]);
+  }, [roomState.status, leaderboard.length]);
 
   const joinUrl = typeof window !== 'undefined' ? `${window.location.origin}/room/${code}/student` : '';
   const currentQ = roomState?.currentQuestion;
@@ -232,9 +424,21 @@ export function ProjectorView({
           </div>
         ) : (
           <div className="my-auto text-center p-8 bg-white/5 rounded-3xl border border-white/10 max-w-md">
-            <span className="text-5xl block mb-2">🏁</span>
-            <h3 className="text-lg font-black text-slate-300">Trận đấu đã kết thúc</h3>
-            <p className="text-xs text-slate-400 mt-1">Chưa có người chơi nào hoàn thành lượt câu hỏi trong phiên này.</p>
+            {roomState.studentsCount > 0 ? (
+              <>
+                <span className="text-5xl block mb-2 animate-spin">⟳</span>
+                <h3 className="text-lg font-black text-slate-200">Đang tổng kết điểm số...</h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  Đang đồng bộ bảng vàng vinh danh từ {roomState.studentsCount} người chơi.
+                </p>
+              </>
+            ) : (
+              <>
+                <span className="text-5xl block mb-2">🏁</span>
+                <h3 className="text-lg font-black text-slate-300">Trận đấu đã kết thúc</h3>
+                <p className="text-xs text-slate-400 mt-1">Chưa có người chơi nào hoàn thành lượt câu hỏi trong phiên này.</p>
+              </>
+            )}
           </div>
         )}
 
@@ -331,50 +535,15 @@ export function ProjectorView({
           </span>
         </div>
 
-        {/* Round Statistics Cards (% Correct / % Wrong & Choice Distribution) */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 my-3 max-w-4xl mx-auto w-full">
-          {/* Correct % Card */}
-          <div className="p-3.5 bg-green-500/20 border-2 border-green-500/40 rounded-2xl flex items-center gap-3">
-            <span className="text-3xl">🎯</span>
-            <div>
-              <span className="text-xs font-bold text-green-300 block uppercase">Trả lời đúng</span>
-              <p className={`font-black text-green-400 font-mono ${isMiniPreview ? 'text-xl' : 'text-3xl'}`}>
-                {pctCorrect}% <span className="text-xs font-normal text-slate-300">({roundStats?.correctCount ?? 0}/{totalAns})</span>
-              </p>
-            </div>
-          </div>
-
-          {/* Wrong % Card */}
-          <div className="p-3.5 bg-red-500/20 border-2 border-red-500/40 rounded-2xl flex items-center gap-3">
-            <span className="text-3xl">💥</span>
-            <div>
-              <span className="text-xs font-bold text-red-300 block uppercase">Trả lời sai</span>
-              <p className={`font-black text-red-400 font-mono ${isMiniPreview ? 'text-xl' : 'text-3xl'}`}>
-                {pctWrong}% <span className="text-xs font-normal text-slate-300">({roundStats?.wrongCount ?? 0}/{totalAns})</span>
-              </p>
-            </div>
-          </div>
-
-          {/* Answer Breakdown (Options A, B, C, D) */}
-          <div className="p-3.5 bg-white/5 border border-white/10 rounded-2xl flex flex-col justify-center">
-            <span className="text-[11px] font-bold text-slate-400 uppercase mb-1">Phân bố lựa chọn</span>
-            <div className="grid grid-cols-4 gap-1 text-center font-bold text-xs">
-              {['A', 'B', 'C', 'D'].map((opt) => {
-                const count = roundStats?.optionCounts?.[opt] ?? 0;
-                const isCorrect = currentQ && currentQ.correctAnswer === opt;
-                return (
-                  <div
-                    key={opt}
-                    className={`py-1 rounded-lg border ${
-                      isCorrect ? 'bg-green-500 text-white border-green-400 font-black' : 'bg-slate-800 text-slate-300 border-slate-700'
-                    }`}
-                  >
-                    <span>{opt}:</span> {count}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+        {/* Round Statistics & Horizontal Bar Chart */}
+        <div className="my-3 max-w-4xl mx-auto w-full">
+          <HorizontalOptionStatsChart
+            roundStats={roundStats}
+            options={currentQ?.options}
+            correctAnswer={currentQ?.correctAnswer}
+            isMiniPreview={isMiniPreview}
+            theme="dark"
+          />
         </div>
 
         {/* Live Leaderboard Top 5 Table */}
@@ -500,6 +669,17 @@ export function ProjectorView({
                 })}
               </div>
             )}
+
+            {/* ROUND STATISTICS & HORIZONTAL BAR CHART */}
+            <div className="my-3 max-w-4xl mx-auto w-full">
+              <HorizontalOptionStatsChart
+                roundStats={roundStats}
+                options={currentQ.options}
+                correctAnswer={currentQ.correctAnswer}
+                isMiniPreview={isMiniPreview}
+                theme="light"
+              />
+            </div>
 
             {/* PROMINENT, BOLD EXPLANATION CARD */}
             {currentQ.explanation && (

@@ -25,6 +25,8 @@ export function useLeaderboard(roomCode: string): UseLeaderboardReturn {
 
   useEffect(() => {
     refresh();
+    const interval = setInterval(refresh, 2500);
+    return () => clearInterval(interval);
   }, [refresh]);
 
   return { leaderboard, loading, refresh };
