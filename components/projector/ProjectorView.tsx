@@ -431,6 +431,17 @@ export function ProjectorView({
                 <p className="text-xs text-slate-400 mt-1">
                   Đang đồng bộ bảng vàng vinh danh từ {roomState.studentsCount} người chơi.
                 </p>
+                <button
+                  onClick={() => {
+                    fetch(`/api/leaderboard/${code}`, { cache: 'no-store' })
+                      .then((res) => res.json())
+                      .then((data) => { if (Array.isArray(data)) setLeaderboard(data); })
+                      .catch(() => {});
+                  }}
+                  className="mt-4 px-5 py-2 bg-yellow-500 hover:bg-yellow-400 text-slate-900 font-black text-sm rounded-2xl transition-all shadow-lg"
+                >
+                  🔄 Tải lại
+                </button>
               </>
             ) : (
               <>
@@ -671,15 +682,7 @@ export function ProjectorView({
             )}
 
             {/* ROUND STATISTICS & HORIZONTAL BAR CHART */}
-            <div className="my-3 max-w-4xl mx-auto w-full">
-              <HorizontalOptionStatsChart
-                roundStats={roundStats}
-                options={currentQ.options}
-                correctAnswer={currentQ.correctAnswer}
-                isMiniPreview={isMiniPreview}
-                theme="light"
-              />
-            </div>
+            {/* Chart moved to showRanking screen only */}
 
             {/* PROMINENT, BOLD EXPLANATION CARD */}
             {currentQ.explanation && (

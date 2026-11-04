@@ -5,17 +5,23 @@ export async function uploadToImgBB(buffer: Buffer, fileName?: string): Promise<
   if (!IMGBB_API_KEY) throw new Error('IMGBB_API_KEY is not configured');
 
   const base64 = buffer.toString('base64');
-  const formData = new FormData();
-  formData.append('image', base64);
-  if (fileName) formData.append('name', fileName);
 
-  const res = await fetch(`${IMGBB_UPLOAD_URL}?key=${IMGBB_API_KEY}`, {
+  const params = new URLSearchParams();
+  params.append('key', IMGBB_API_KEY);
+  params.append('image', base64);
+  if (fileName) params.append('name', fileName);
+
+  const res = await fetch(IMGBB_UPLOAD_URL, {
     method: 'POST',
-    body: formData,
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: params.toString(),
   });
 
-  if (!res.ok) throw new Error(`ImgBB upload failed: ${res.status}`);
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`ImgBB upload failed: ${res.status} ${errText}`);
+  }
   const data = await res.json();
-  if (!data.success) throw new Error('ImgBB upload failed');
+  if (!data.success) throw new Error('ImgBB upload failed: ' + JSON.stringify(data));
   return data.data.display_url as string;
 }

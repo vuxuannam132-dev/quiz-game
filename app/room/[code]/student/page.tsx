@@ -13,7 +13,7 @@ import { ResultFeedback } from '@/components/student/ResultFeedback';
 import { Timer } from '@/components/shared/Timer';
 import { Leaderboard } from '@/components/shared/Leaderboard';
 import { useLeaderboard } from '@/hooks/useLeaderboard';
-import { RoomMode } from '@/types';
+import { RoomMode, LeaderboardEntry } from '@/types';
 
 interface AnswerResult {
   correct: boolean;
@@ -43,9 +43,34 @@ export default function StudentPage() {
   const [monitorEnabled, setMonitorEnabled] = useState(false);
   const questionStartTimeRef = useRef<number>(Date.now());
 
+  const [finalLeaderboard, setFinalLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const finalLeaderboardFetchedRef = useRef(false);
+
   const { roomState, loading } = useRoomPolling(joined ? code : '', 1500);
   const { leaderboard } = useLeaderboard(code);
   const { play } = useSound(soundEnabled);
+
+  // When game finishes, fetch leaderboard directly to guarantee data
+  useEffect(() => {
+    if (roomState?.status === 'finished' && code && !finalLeaderboardFetchedRef.current) {
+      finalLeaderboardFetchedRef.current = true;
+      const fetchFinal = () => {
+        fetch(`/api/leaderboard/${code}`, { cache: 'no-store' })
+          .then((res) => res.json())
+          .then((data) => {
+            if (Array.isArray(data) && data.length > 0) {
+              setFinalLeaderboard(data);
+            } else {
+              // Retry after 1.5s if empty
+              setTimeout(fetchFinal, 1500);
+            }
+          })
+          .catch(() => setTimeout(fetchFinal, 2000));
+      };
+      // Small delay to let the server finalize scores
+      setTimeout(fetchFinal, 500);
+    }
+  }, [roomState?.status, code]);
 
   useEffect(() => {
     const savedId = localStorage.getItem(`sessionId_${code}`) || uuidv4();
@@ -232,19 +257,26 @@ export default function StudentPage() {
 
   // Game Finished
   if (roomState?.status === 'finished') {
-    const myRank = leaderboard.find((e) => e.studentName === studentName);
+    // Prefer finalLeaderboard (direct fetch), fallback to hook leaderboard
+    const displayLeaderboard = finalLeaderboard.length > 0 ? finalLeaderboard : leaderboard;
+    const myRank = displayLeaderboard.find((e) => e.studentName === studentName);
     return (
       <div className="min-h-screen bg-brand-bg p-6 max-w-md mx-auto text-center">
         <div className="text-7xl mb-4">🏆</div>
         <h1 className="text-3xl font-black text-slate-900 mb-2">Trận đấu kết thúc!</h1>
-        {myRank && (
+        {myRank ? (
           <div className="bg-white border-2 border-slate-200 rounded-3xl p-6 shadow-xl mb-6">
             <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Thành tích của bạn</span>
             <div className="text-5xl font-black text-brand-yellow mb-2">{myRank.totalScore.toLocaleString()}</div>
             <p className="font-bold text-slate-700">Hạng #{myRank.rank} • Đúng {myRank.correctCount} câu</p>
           </div>
-        )}
-        <Leaderboard entries={leaderboard} />
+        ) : displayLeaderboard.length === 0 ? (
+          <div className="bg-white border-2 border-slate-200 rounded-3xl p-6 shadow-xl mb-6 text-center">
+            <span className="text-3xl block mb-2 animate-spin inline-block">⟳</span>
+            <p className="text-slate-500 font-bold text-sm">Đang tải kết quả...</p>
+          </div>
+        ) : null}
+        <Leaderboard entries={displayLeaderboard} />
       </div>
     );
   }
