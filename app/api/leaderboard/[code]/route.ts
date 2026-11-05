@@ -125,9 +125,15 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
       totalTimeSpent: item.totalTimeSpent,
     }));
 
-    return NextResponse.json(leaderboard);
+    return NextResponse.json(leaderboard, {
+      headers: {
+        'X-Leaderboard-Version': 'v2-raw-sql-deployed',
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+      }
+    });
   } catch (e: any) {
     console.error('Leaderboard error:', e);
     return NextResponse.json({ error: 'Lỗi lấy bảng xếp hạng: ' + e.message }, { status: 500 });
   }
 }
+
