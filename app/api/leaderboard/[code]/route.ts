@@ -3,11 +3,14 @@ import { neon } from '@neondatabase/serverless';
 import { LeaderboardEntry } from '@/types';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
 
 export async function GET(req: NextRequest, { params }: { params: { code: string } }) {
   try {
     const code = params.code.toUpperCase().trim();
     const sql = neon(process.env.DATABASE_URL!);
+
 
     // 1. Fetch room using raw SQL for maximum reliability
     const roomRows = await sql`
@@ -127,8 +130,10 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
 
     return NextResponse.json(leaderboard, {
       headers: {
-        'X-Leaderboard-Version': 'v2-raw-sql-deployed',
-        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'X-Leaderboard-Version': 'v3-no-cache',
+        'X-Debug-Sessions-Count': String(sessions.length),
+        'X-Debug-Timestamp': new Date().toISOString(),
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
       }
     });
   } catch (e: any) {
@@ -136,4 +141,5 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
     return NextResponse.json({ error: 'Lỗi lấy bảng xếp hạng: ' + e.message }, { status: 500 });
   }
 }
+
 
