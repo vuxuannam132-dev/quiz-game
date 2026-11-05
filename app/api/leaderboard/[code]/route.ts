@@ -11,7 +11,6 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
     const code = params.code.toUpperCase().trim();
     const sql = neon(process.env.DATABASE_URL!);
 
-
     // 1. Fetch room using raw SQL for maximum reliability
     const roomRows = await sql`
       SELECT code, status, students 
@@ -33,9 +32,10 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
       WHERE room_code = ${code}
     `;
 
-    // 3. Map existing sessions
+    // 3. Map existing sessions by session_id (primary) and normalized student_name
     const playerMap = new Map<string, {
       studentName: string;
+      sessionId: string;
       totalScore: number;
       correctCount: number;
       totalTimeSpent: number;
@@ -62,17 +62,21 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
         answers = [];
       }
 
-      const correctCount = answers.filter((a) => a && a.correct).length;
+      const correctCount = answers.filter((a) => a && Boolean(a.correct)).length;
       const totalTimeSpent = answers.reduce((acc, a) => acc + (Number(a?.timeSpent) || 0), 0);
-      const score = Number(s.total_score) || 0;
+      const sumPoints = answers.reduce((acc, a) => acc + (Number(a?.points) || 0), 0);
+      const score = Math.max(Number(s.total_score) || 0, sumPoints);
       const studentName = String(s.student_name || '').trim();
+      const sid = String(s.session_id || '').trim();
 
-      if (!studentName) continue;
+      if (!studentName && !sid) continue;
 
-      const existing = playerMap.get(studentName);
+      const key = sid || studentName.toLowerCase();
+      const existing = playerMap.get(key);
       if (!existing || score > existing.totalScore) {
-        playerMap.set(studentName, {
-          studentName,
+        playerMap.set(key, {
+          studentName: studentName || 'Học sinh',
+          sessionId: sid,
           totalScore: score,
           correctCount,
           totalTimeSpent: Number(totalTimeSpent.toFixed(2)),
@@ -96,9 +100,12 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
 
     for (const stu of studentsInRoom) {
       const name = String(stu?.name || '').trim();
-      if (name && !playerMap.has(name)) {
-        playerMap.set(name, {
-          studentName: name,
+      const sid = String(stu?.sessionId || '').trim();
+      const key = sid || name.toLowerCase();
+      if ((name || sid) && !playerMap.has(key)) {
+        playerMap.set(key, {
+          studentName: name || 'Học sinh',
+          sessionId: sid,
           totalScore: 0,
           correctCount: 0,
           totalTimeSpent: 0,
@@ -123,6 +130,7 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
     const leaderboard: LeaderboardEntry[] = mapped.map((item, index) => ({
       rank: index + 1,
       studentName: item.studentName,
+      sessionId: item.sessionId || undefined,
       totalScore: item.totalScore,
       correctCount: item.correctCount,
       totalTimeSpent: item.totalTimeSpent,
@@ -138,6 +146,3 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
     return NextResponse.json({ error: 'Lỗi lấy bảng xếp hạng: ' + e.message }, { status: 500 });
   }
 }
-
-
-

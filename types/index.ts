@@ -138,6 +138,7 @@ export interface AnswerResponse {
 export interface LeaderboardEntry {
   rank: number;
   studentName: string;
+  sessionId?: string;
   totalScore: number;
   correctCount: number;
   totalTimeSpent?: number;

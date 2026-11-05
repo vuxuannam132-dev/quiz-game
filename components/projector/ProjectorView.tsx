@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RoomStateResponse, LeaderboardEntry } from '@/types';
 import { QRCodeSVG } from 'qrcode.react';
+import { QRDownloadButtons } from '@/components/shared/QRDownloadButtons';
 import { Timer } from '@/components/shared/Timer';
 import { formatScore, getRankSuffix } from '@/lib/gameLogic';
 
@@ -256,6 +257,7 @@ export function ProjectorView({
   isMiniPreview = false,
 }: ProjectorViewProps) {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>(externalLeaderboard);
+  const [refreshing, setRefreshing] = useState(false);
   const confettiFiredRef = useRef(false);
   const leaderboardRef = useRef<LeaderboardEntry[]>(externalLeaderboard);
 
@@ -287,20 +289,9 @@ export function ProjectorView({
 
     doFetch();
 
-    // If finished and leaderboard empty, retry aggressively every 1s
-    if (roomState.status === 'finished') {
-      const id = setInterval(() => {
-        if (leaderboardRef.current.length > 0) {
-          clearInterval(id);
-          return;
-        }
-        doFetch();
-      }, 1000);
-      return () => clearInterval(id);
-    }
-
-    // Normal polling every 2s otherwise
-    const id = setInterval(doFetch, 2000);
+    // Aggressive polling every 1.5s when finished to ensure podium appears as soon as scores are finalized
+    const intervalTime = roomState.status === 'finished' ? 1500 : 2000;
+    const id = setInterval(doFetch, intervalTime);
     return () => clearInterval(id);
   }, [code, roomState.status, roomState.showRanking, roomState.currentQuestionIndex]);
 
@@ -495,14 +486,22 @@ export function ProjectorView({
                 </p>
                 <button
                   onClick={() => {
+                    setRefreshing(true);
                     fetch(`/api/leaderboard/${code}`, { cache: 'no-store' })
                       .then((res) => res.json())
-                      .then((data) => { if (Array.isArray(data)) setLeaderboard(data); })
-                      .catch(() => {});
+                      .then((data) => {
+                        if (Array.isArray(data) && data.length > 0) {
+                          setLeaderboard(data);
+                        }
+                      })
+                      .catch(() => {})
+                      .finally(() => setRefreshing(false));
                   }}
-                  className="mt-4 px-5 py-2 bg-yellow-500 hover:bg-yellow-400 text-slate-900 font-black text-sm rounded-2xl transition-all shadow-lg"
+                  disabled={refreshing}
+                  className="mt-4 px-5 py-2 bg-yellow-500 hover:bg-yellow-400 active:scale-95 text-slate-900 font-black text-sm rounded-2xl transition-all shadow-lg disabled:opacity-50 inline-flex items-center gap-2"
                 >
-                  🔄 Tải lại
+                  <span className={refreshing ? 'animate-spin inline-block' : ''}>🔄</span>
+                  <span>{refreshing ? 'Đang tải lại...' : 'Tải lại'}</span>
                 </button>
               </>
             ) : (
@@ -559,6 +558,7 @@ export function ProjectorView({
         <div className={`bg-white rounded-3xl shadow-xl border-4 border-slate-200 flex flex-col items-center ${isMiniPreview ? 'p-3 mb-3' : 'p-6 mb-6'}`}>
           {joinUrl && (
             <QRCodeSVG
+              id={`qr-projector-${code}`}
               value={joinUrl}
               size={isMiniPreview ? 130 : 220}
               level="H"
@@ -571,6 +571,13 @@ export function ProjectorView({
               {code}
             </span>
           </div>
+          <QRDownloadButtons
+            code={code}
+            roomName={roomState.name}
+            targetSvgId={`qr-projector-${code}`}
+            size={isMiniPreview ? 'sm' : 'md'}
+            className="mt-3"
+          />
         </div>
 
         <div className="bg-white px-5 py-2 rounded-full border border-slate-200 shadow-sm flex items-center gap-2">

@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { RoomCreator } from '@/components/admin/RoomCreator';
 import { CreateRoomResponse } from '@/types';
 import { QRCodeSVG } from 'qrcode.react';
+import { QRDownloadButtons } from '@/components/shared/QRDownloadButtons';
 
 interface Room {
   _id: string;
@@ -122,8 +123,9 @@ export default function RoomsPage() {
             className="mb-8 p-6 bg-white border-2 border-green-500 rounded-3xl shadow-xl flex flex-col lg:flex-row items-center justify-between gap-6"
           >
             <div className="flex flex-col sm:flex-row items-center gap-6 text-center sm:text-left w-full lg:w-auto">
-              <div className="p-2 bg-white rounded-2xl border-2 border-slate-200 shadow-sm shrink-0">
+              <div className="p-2 bg-white rounded-2xl border-2 border-slate-200 shadow-sm shrink-0 flex flex-col items-center">
                 <QRCodeSVG
+                  id={`qr-created-${createdRoom.code}`}
                   value={`${origin}/room/${createdRoom.code}/student`}
                   size={110}
                   level="M"
@@ -150,6 +152,13 @@ export default function RoomsPage() {
                     <span>{copiedCode === createdRoom.code ? '✓ Đã copy link' : '🔗 Copy link'}</span>
                   </button>
                 </div>
+                <QRDownloadButtons
+                  code={createdRoom.code}
+                  roomName={createdRoom.name}
+                  targetSvgId={`qr-created-${createdRoom.code}`}
+                  size="sm"
+                  className="mt-3 sm:items-start"
+                />
               </div>
             </div>
 
@@ -260,7 +269,7 @@ export default function RoomsPage() {
                           className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors border border-slate-200"
                           title="Xem mã QR và link tham gia"
                         >
-                          <span>📱 Mã QR</span>
+                          <span>📱 Mã QR & Tải ảnh</span>
                         </button>
                       </td>
                       <td className="px-6 py-4 text-right">
@@ -328,14 +337,25 @@ export default function RoomsPage() {
               </div>
 
               <div className="my-6 flex justify-center">
-                <div className="p-4 bg-white rounded-2xl border-2 border-slate-200 shadow-md">
+                <div className="p-4 bg-white rounded-2xl border-2 border-slate-200 shadow-md flex flex-col items-center">
                   <QRCodeSVG
+                    id={`qr-modal-${qrModalCode}`}
                     value={`${origin}/room/${qrModalCode}/student`}
                     size={200}
                     level="H"
                     includeMargin={true}
                   />
                 </div>
+              </div>
+
+              {/* QR Download Buttons */}
+              <div className="mb-4">
+                <QRDownloadButtons
+                  code={qrModalCode}
+                  roomName={rooms.find((r) => r.code === qrModalCode)?.name}
+                  targetSvgId={`qr-modal-${qrModalCode}`}
+                  size="md"
+                />
               </div>
 
               <div className="mb-4">

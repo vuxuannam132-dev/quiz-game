@@ -56,19 +56,24 @@ export default function StudentPage() {
   useEffect(() => {
     if (roomState?.showRanking && code) {
       showRankingRef.current = true;
+      let cancelled = false;
       const fetchRankingLB = () => {
         fetch(`/api/leaderboard/${code}`, { cache: 'no-store' })
           .then((r) => r.json())
           .then((data) => {
+            if (cancelled) return;
             if (Array.isArray(data) && data.length > 0) {
               setRankingLeaderboard(data);
-            } else {
-              setTimeout(fetchRankingLB, 1000);
             }
           })
-          .catch(() => setTimeout(fetchRankingLB, 1500));
+          .catch(() => {});
       };
       fetchRankingLB();
+      const id = setInterval(fetchRankingLB, 1500);
+      return () => {
+        cancelled = true;
+        clearInterval(id);
+      };
     } else if (!roomState?.showRanking) {
       showRankingRef.current = false;
     }
@@ -76,26 +81,25 @@ export default function StudentPage() {
 
   // When game finishes, fetch leaderboard directly to guarantee data
   useEffect(() => {
-    if (roomState?.status === 'finished' && code && !finalLeaderboardFetchedRef.current) {
-      finalLeaderboardFetchedRef.current = true;
-      const fetchFinal = (attempt = 0) => {
+    if (roomState?.status === 'finished' && code) {
+      let cancelled = false;
+      const fetchFinal = () => {
         fetch(`/api/leaderboard/${code}`, { cache: 'no-store', credentials: 'include' })
           .then((res) => res.json())
           .then((data) => {
+            if (cancelled) return;
             if (Array.isArray(data) && data.length > 0) {
               setFinalLeaderboard(data);
-            } else if (attempt < 20) {  // Max 20 retries (~30 seconds)
-              setTimeout(() => fetchFinal(attempt + 1), 1500);
             }
           })
-          .catch(() => {
-            if (attempt < 20) {
-              setTimeout(() => fetchFinal(attempt + 1), 2000);
-            }
-          });
+          .catch(() => {});
       };
-      // Small delay to let the server finalize scores
-      setTimeout(fetchFinal, 500);
+      fetchFinal();
+      const id = setInterval(fetchFinal, 1500);
+      return () => {
+        cancelled = true;
+        clearInterval(id);
+      };
     }
   }, [roomState?.status, code]);
 
@@ -135,13 +139,26 @@ export default function StudentPage() {
       setRoomMode(data.mode);
       setSoundEnabled(data.settings?.soundEnabled ?? true);
       setMonitorEnabled(data.settings?.monitorTabSwitch ?? false);
-      localStorage.setItem(`studentName_${code}`, name);
+      if (data.studentName) {
+        setStudentName(data.studentName);
+        localStorage.setItem(`studentName_${code}`, data.studentName);
+      } else {
+        localStorage.setItem(`studentName_${code}`, name);
+      }
     } catch (err: any) {
       setJoinError(err.message || 'Không thể tham gia phòng');
     } finally {
       setJoining(false);
     }
   };
+
+  const isMe = useCallback((entry: LeaderboardEntry) => {
+    if (entry.sessionId && sessionId && entry.sessionId === sessionId) return true;
+    if (entry.studentName && studentName) {
+      return entry.studentName.trim().toLowerCase() === studentName.trim().toLowerCase();
+    }
+    return false;
+  }, [sessionId, studentName]);
 
   const handleNameSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -286,7 +303,8 @@ export default function StudentPage() {
   if (roomState?.status === 'finished') {
     // Prefer finalLeaderboard (direct fetch), fallback to hook leaderboard
     const displayLeaderboard = finalLeaderboard.length > 0 ? finalLeaderboard : leaderboard;
-    const myRank = displayLeaderboard.find((e) => e.studentName === studentName);
+    const myRank = displayLeaderboard.find(isMe);
+    const myScore = myRank ? Math.max(myRank.totalScore, totalScore) : totalScore;
     return (
       <div className="min-h-screen bg-brand-bg p-6 max-w-md mx-auto text-center">
         <div className="text-7xl mb-4">🏆</div>
@@ -294,7 +312,7 @@ export default function StudentPage() {
         {myRank ? (
           <div className="bg-white border-2 border-slate-200 rounded-3xl p-6 shadow-xl mb-6">
             <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Thành tích của bạn</span>
-            <div className="text-5xl font-black text-brand-yellow mb-2">{myRank.totalScore.toLocaleString()}</div>
+            <div className="text-5xl font-black text-brand-yellow mb-2">{myScore.toLocaleString()}</div>
             <p className="font-bold text-slate-700">Hạng #{myRank.rank} • Đúng {myRank.correctCount} câu</p>
           </div>
         ) : displayLeaderboard.length === 0 ? (
@@ -302,7 +320,13 @@ export default function StudentPage() {
             <span className="text-3xl block mb-2 animate-spin inline-block">⟳</span>
             <p className="text-slate-500 font-bold text-sm">Đang tải kết quả...</p>
           </div>
-        ) : null}
+        ) : (
+          <div className="bg-white border-2 border-slate-200 rounded-3xl p-6 shadow-xl mb-6">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Điểm số của bạn</span>
+            <div className="text-5xl font-black text-brand-yellow mb-2">{totalScore.toLocaleString()}</div>
+            <p className="font-bold text-slate-700">{studentName}</p>
+          </div>
+        )}
         <Leaderboard entries={displayLeaderboard} />
       </div>
     );
@@ -350,7 +374,9 @@ export default function StudentPage() {
 
           {/* My rank card */}
           {(() => {
-            const myRank = rankingLeaderboard.find((e) => e.studentName === studentName);
+            const activeList = rankingLeaderboard.length > 0 ? rankingLeaderboard : leaderboard;
+            const myRank = activeList.find(isMe);
+            const myScore = myRank ? Math.max(myRank.totalScore, totalScore) : totalScore;
             return (
               <div className="bg-slate-800 border-2 border-slate-700 rounded-3xl p-5 shadow-xl mb-3 max-w-sm mx-auto w-full">
                 <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Thứ hạng của bạn</span>
@@ -365,40 +391,46 @@ export default function StudentPage() {
                       : 'text-white'
                   }`}
                 >
-                  {myRank ? `#${myRank.rank}` : rankingLeaderboard.length === 0 ? '...' : '-'}
+                  {myRank ? `#${myRank.rank}` : activeList.length === 0 ? '...' : '-'}
                 </div>
-                <div className="text-2xl font-black text-brand-yellow">{totalScore.toLocaleString()} pts</div>
-                <p className="text-slate-400 text-xs mt-1">Đúng {myRank?.correctCount ?? 0} câu</p>
+                <div className="text-2xl font-black text-brand-yellow">{myScore.toLocaleString()} pts</div>
+                <p className="text-slate-400 text-xs mt-1">
+                  {myRank ? `Đúng ${myRank.correctCount} câu` : 'Đang tính toán thứ hạng...'}
+                </p>
               </div>
             );
           })()}
 
           {/* Mini top 5 leaderboard */}
-          {rankingLeaderboard.length > 0 && (
-            <div className="max-w-sm mx-auto w-full space-y-1.5 mb-3">
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
-                Top {Math.min(5, rankingLeaderboard.length)} lớp
-              </p>
-              {rankingLeaderboard.slice(0, 5).map((entry, idx) => (
-                <div
-                  key={entry.studentName}
-                  className={`flex items-center gap-2.5 px-3 py-2 rounded-2xl text-xs font-bold border ${
-                    entry.studentName === studentName
-                      ? 'bg-blue-600/40 border-blue-400 text-white ring-1 ring-blue-400'
-                      : idx === 0
-                      ? 'bg-yellow-500/20 border-yellow-500/40 text-yellow-200'
-                      : 'bg-white/5 border-white/10 text-slate-200'
-                  }`}
-                >
-                  <span className="w-5 text-center font-mono">
-                    {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${entry.rank}`}
-                  </span>
-                  <span className="flex-1 truncate text-left">{entry.studentName}</span>
-                  <span className="font-mono text-brand-yellow shrink-0">{entry.totalScore.toLocaleString()}</span>
-                </div>
-              ))}
-            </div>
-          )}
+          {(() => {
+            const activeList = rankingLeaderboard.length > 0 ? rankingLeaderboard : leaderboard;
+            if (activeList.length === 0) return null;
+            return (
+              <div className="max-w-sm mx-auto w-full space-y-1.5 mb-3">
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                  Top {Math.min(5, activeList.length)} lớp
+                </p>
+                {activeList.slice(0, 5).map((entry, idx) => (
+                  <div
+                    key={entry.sessionId || entry.studentName}
+                    className={`flex items-center gap-2.5 px-3 py-2 rounded-2xl text-xs font-bold border ${
+                      isMe(entry)
+                        ? 'bg-blue-600/40 border-blue-400 text-white ring-1 ring-blue-400'
+                        : idx === 0
+                        ? 'bg-yellow-500/20 border-yellow-500/40 text-yellow-200'
+                        : 'bg-white/5 border-white/10 text-slate-200'
+                    }`}
+                  >
+                    <span className="w-5 text-center font-mono">
+                      {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${entry.rank}`}
+                    </span>
+                    <span className="flex-1 truncate text-left">{entry.studentName}</span>
+                    <span className="font-mono text-brand-yellow shrink-0">{entry.totalScore.toLocaleString()}</span>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
 
           <p className="text-slate-500 text-xs font-bold">Nhìn lên màn chiếu để xem toàn lớp!</p>
         </div>

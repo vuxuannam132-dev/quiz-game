@@ -7,6 +7,10 @@ import { eq } from 'drizzle-orm';
 import { getRoomStateFromCache, setRoomStateInCache, invalidateRoomCache } from '@/lib/redis';
 import { RoundStats } from '@/types';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
+
 export async function GET(req: NextRequest, { params }: { params: { code: string } }) {
   try {
     const code = params.code.toUpperCase().trim();
@@ -96,7 +100,11 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
       teacherInfo,
     };
 
-    return NextResponse.json(state);
+    return NextResponse.json(state, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+      },
+    });
   } catch (e: any) {
     console.error('Error fetching room state:', e);
     return NextResponse.json({ error: 'Lỗi lấy thông tin phòng: ' + (e?.message || e) }, { status: 500 });
