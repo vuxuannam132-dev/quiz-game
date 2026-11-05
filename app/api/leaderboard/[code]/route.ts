@@ -130,9 +130,6 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
 
     return NextResponse.json(leaderboard, {
       headers: {
-        'X-Leaderboard-Version': 'v3-no-cache',
-        'X-Debug-Sessions-Count': String(sessions.length),
-        'X-Debug-Timestamp': new Date().toISOString(),
         'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
       }
     });
@@ -141,5 +138,6 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
     return NextResponse.json({ error: 'Lỗi lấy bảng xếp hạng: ' + e.message }, { status: 500 });
   }
 }
+
 
 
