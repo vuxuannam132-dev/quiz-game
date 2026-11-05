@@ -7,9 +7,23 @@ import { LeaderboardEntry } from '@/types';
 export async function GET(req: NextRequest, { params }: { params: { code: string } }) {
   try {
     const code = params.code.toUpperCase().trim();
+    console.log('[LEADERBOARD DEBUG] code:', code);
+    console.log('[LEADERBOARD DEBUG] DATABASE_URL prefix:', process.env.DATABASE_URL?.slice(0, 60));
+
     const [room] = await db.select().from(rooms).where(eq(rooms.code, code)).limit(1);
+    console.log('[LEADERBOARD DEBUG] room found:', !!room, 'status:', room?.status);
+    console.log('[LEADERBOARD DEBUG] room.students:', JSON.stringify(room?.students));
+
     if (!room) return NextResponse.json({ error: 'Phòng không tồn tại' }, { status: 404 });
-    const sessions = await db.select().from(gameSessions).where(eq(gameSessions.roomCode, code));
+
+    let sessions: any[] = [];
+    try {
+      sessions = await db.select().from(gameSessions).where(eq(gameSessions.roomCode, code));
+      console.log('[LEADERBOARD DEBUG] sessions count:', sessions.length);
+      console.log('[LEADERBOARD DEBUG] sessions data:', JSON.stringify(sessions.map(s => ({ studentName: s.studentName, totalScore: s.totalScore, roomCode: s.roomCode }))));
+    } catch (sessionErr: any) {
+      console.error('[LEADERBOARD DEBUG] sessions query THREW:', sessionErr?.message);
+    }
 
     // Map existing sessions
     const playerMap = new Map<string, {
@@ -49,6 +63,7 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
 
     // Also include any students in room.students who may not have a session yet
     const studentsInRoom = (room?.students ?? []) as Array<{ name: string; sessionId: string }>;
+    console.log('[LEADERBOARD DEBUG] studentsInRoom count:', studentsInRoom.length);
     studentsInRoom.forEach((stu) => {
       if (stu.name && !playerMap.has(stu.name)) {
         playerMap.set(stu.name, {
@@ -62,6 +77,7 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
     });
 
     const mapped = Array.from(playerMap.values());
+    console.log('[LEADERBOARD DEBUG] playerMap size:', playerMap.size, 'mapped:', mapped.length);
 
     // Sort: 1) totalScore DESC, 2) totalTimeSpent ASC (tie-break), 3) submittedAt ASC
     mapped.sort((a, b) => {
@@ -82,9 +98,10 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
       totalTimeSpent: item.totalTimeSpent,
     }));
 
+    console.log('[LEADERBOARD DEBUG] returning leaderboard size:', leaderboard.length);
     return NextResponse.json(leaderboard);
   } catch (e: any) {
-    console.error('Leaderboard error:', e);
+    console.error('[LEADERBOARD DEBUG] CAUGHT ERROR:', e?.message, e?.stack);
     return NextResponse.json({ error: 'Lỗi lấy bảng xếp hạng: ' + e.message }, { status: 500 });
   }
 }
