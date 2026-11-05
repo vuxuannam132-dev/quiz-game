@@ -11,10 +11,16 @@ export function useLeaderboard(roomCode: string): UseLeaderboardReturn {
     if (!roomCode) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/leaderboard/${roomCode}`, { cache: 'no-store' });
+      const res = await fetch(`/api/leaderboard/${roomCode}`, { 
+        cache: 'no-store',
+        credentials: 'include'
+      });
       if (res.ok) {
         const data = await res.json();
         setLeaderboard(Array.isArray(data) ? data : []);
+      } else {
+        // For 404 (room not found), keep existing data; for other errors, log
+        console.warn('Leaderboard fetch failed:', res.status);
       }
     } catch (error) {
       console.error('Failed to fetch leaderboard:', error);

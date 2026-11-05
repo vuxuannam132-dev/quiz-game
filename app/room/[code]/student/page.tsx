@@ -78,18 +78,21 @@ export default function StudentPage() {
   useEffect(() => {
     if (roomState?.status === 'finished' && code && !finalLeaderboardFetchedRef.current) {
       finalLeaderboardFetchedRef.current = true;
-      const fetchFinal = () => {
-        fetch(`/api/leaderboard/${code}`, { cache: 'no-store' })
+      const fetchFinal = (attempt = 0) => {
+        fetch(`/api/leaderboard/${code}`, { cache: 'no-store', credentials: 'include' })
           .then((res) => res.json())
           .then((data) => {
             if (Array.isArray(data) && data.length > 0) {
               setFinalLeaderboard(data);
-            } else {
-              // Retry after 1.5s if empty
-              setTimeout(fetchFinal, 1500);
+            } else if (attempt < 20) {  // Max 20 retries (~30 seconds)
+              setTimeout(() => fetchFinal(attempt + 1), 1500);
             }
           })
-          .catch(() => setTimeout(fetchFinal, 2000));
+          .catch(() => {
+            if (attempt < 20) {
+              setTimeout(() => fetchFinal(attempt + 1), 2000);
+            }
+          });
       };
       // Small delay to let the server finalize scores
       setTimeout(fetchFinal, 500);
@@ -362,7 +365,7 @@ export default function StudentPage() {
                       : 'text-white'
                   }`}
                 >
-                  #{myRank?.rank ?? '?'}
+                  {myRank ? `#${myRank.rank}` : rankingLeaderboard.length === 0 ? '...' : '-'}
                 </div>
                 <div className="text-2xl font-black text-brand-yellow">{totalScore.toLocaleString()} pts</div>
                 <p className="text-slate-400 text-xs mt-1">Đúng {myRank?.correctCount ?? 0} câu</p>

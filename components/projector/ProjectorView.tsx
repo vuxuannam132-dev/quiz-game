@@ -257,6 +257,7 @@ export function ProjectorView({
 }: ProjectorViewProps) {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>(externalLeaderboard);
   const confettiFiredRef = useRef(false);
+  const leaderboardRef = useRef<LeaderboardEntry[]>(externalLeaderboard);
 
   // Sync external leaderboard or fetch directly to guarantee data is never empty
   useEffect(() => {
@@ -264,6 +265,11 @@ export function ProjectorView({
       setLeaderboard(externalLeaderboard);
     }
   }, [externalLeaderboard]);
+
+  // Keep ref in sync with state so intervals read the latest value (avoids stale closure)
+  useEffect(() => {
+    leaderboardRef.current = leaderboard;
+  }, [leaderboard]);
 
   useEffect(() => {
     if (!code) return;
@@ -284,7 +290,7 @@ export function ProjectorView({
     // If finished and leaderboard empty, retry aggressively every 1s
     if (roomState.status === 'finished') {
       const id = setInterval(() => {
-        if (leaderboard.length > 0) {
+        if (leaderboardRef.current.length > 0) {
           clearInterval(id);
           return;
         }

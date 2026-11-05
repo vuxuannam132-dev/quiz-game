@@ -8,6 +8,7 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
   try {
     const code = params.code.toUpperCase().trim();
     const [room] = await db.select().from(rooms).where(eq(rooms.code, code)).limit(1);
+    if (!room) return NextResponse.json({ error: 'Phòng không tồn tại' }, { status: 404 });
     const sessions = await db.select().from(gameSessions).where(eq(gameSessions.roomCode, code));
 
     // Map existing sessions

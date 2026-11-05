@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
 
     const [room] = await db.select().from(rooms).where(eq(rooms.code, roomCode.toUpperCase())).limit(1);
     if (!room) return NextResponse.json({ error: 'Phòng không tồn tại' }, { status: 404 });
-    if (room.status !== 'playing') return NextResponse.json({ error: 'Phòng chưa bắt đầu' }, { status: 400 });
+    if (room.status !== 'playing' && room.status !== 'paused') return NextResponse.json({ error: 'Phòng không ở trạng thái cho phép trả lời' }, { status: 400 });
 
     const [question] = await db.select().from(questions).where(eq(questions.id, questionId)).limit(1);
     if (!question) return NextResponse.json({ error: 'Câu hỏi không tồn tại' }, { status: 404 });
