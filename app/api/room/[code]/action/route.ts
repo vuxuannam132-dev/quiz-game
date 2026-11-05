@@ -86,7 +86,7 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
     }
 
     let roundStats: RoundStats | undefined;
-    if ((updated.questionRevealed || updated.showRanking) && currentQuestion) {
+    if (currentQuestion) {
       const qId = (currentQuestion as any).id;
       const sessions = await db.select({ answers: gameSessions.answers })
         .from(gameSessions)
@@ -113,14 +113,12 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
       const percentCorrect = totalAnswered > 0 ? Math.round((correctCount / totalAnswered) * 100) : 0;
       const percentWrong = totalAnswered > 0 ? 100 - percentCorrect : 0;
 
-      roundStats = {
-        totalAnswered,
-        correctCount,
-        wrongCount,
-        percentCorrect,
-        percentWrong,
-        optionCounts,
-      };
+      // Only expose detailed stats when revealed/ranking, otherwise just totalAnswered for live counter
+      if (updated.questionRevealed || updated.showRanking) {
+        roundStats = { totalAnswered, correctCount, wrongCount, percentCorrect, percentWrong, optionCounts };
+      } else {
+        roundStats = { totalAnswered, correctCount: 0, wrongCount: 0, percentCorrect: 0, percentWrong: 0, optionCounts: {} };
+      }
     }
 
     const newState = {

@@ -42,9 +42,9 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
       }
     }
 
-    // Compute round statistics if question is revealed or showing ranking
+    // Compute round statistics - always compute totalAnswered for the live counter
     let roundStats: RoundStats | undefined;
-    if ((room.questionRevealed || room.showRanking) && currentQuestion) {
+    if (currentQuestion) {
       const qId = (currentQuestion as any).id;
       const sessions = await db.select({ answers: gameSessions.answers })
         .from(gameSessions)
@@ -71,14 +71,12 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
       const percentCorrect = totalAnswered > 0 ? Math.round((correctCount / totalAnswered) * 100) : 0;
       const percentWrong = totalAnswered > 0 ? 100 - percentCorrect : 0;
 
-      roundStats = {
-        totalAnswered,
-        correctCount,
-        wrongCount,
-        percentCorrect,
-        percentWrong,
-        optionCounts,
-      };
+      // Only expose detailed stats when revealed/ranking, otherwise just totalAnswered for live counter
+      if (room.questionRevealed || room.showRanking) {
+        roundStats = { totalAnswered, correctCount, wrongCount, percentCorrect, percentWrong, optionCounts };
+      } else {
+        roundStats = { totalAnswered, correctCount: 0, wrongCount: 0, percentCorrect: 0, percentWrong: 0, optionCounts: {} };
+      }
     }
 
     const state = {

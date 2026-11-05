@@ -29,6 +29,47 @@ interface HorizontalOptionStatsChartProps {
   theme?: 'dark' | 'light';
 }
 
+function AnsweredCountBadge({
+  count,
+  total,
+  isMiniPreview = false,
+}: {
+  count: number;
+  total: number;
+  isMiniPreview?: boolean;
+}) {
+  const [popping, setPopping] = useState(false);
+  const prevCountRef = useRef(count);
+
+  useEffect(() => {
+    if (count !== prevCountRef.current && count > 0) {
+      prevCountRef.current = count;
+      setPopping(true);
+      const t = setTimeout(() => setPopping(false), 400);
+      return () => clearTimeout(t);
+    }
+  }, [count]);
+
+  if (total === 0) return null;
+
+  return (
+    <div
+      className={`absolute bottom-3 left-3 flex items-center gap-1.5 bg-slate-900/80 backdrop-blur-sm border border-slate-700 rounded-2xl px-3 py-1.5 shadow-lg select-none pointer-events-none z-10 ${
+        isMiniPreview ? 'text-[10px]' : 'text-xs sm:text-sm'
+      }`}
+    >
+      <span className="text-slate-400 font-bold">✅</span>
+      <span
+        className={`font-black text-white ${popping ? 'text-brand-yellow' : ''}`}
+        style={{ transform: popping ? 'scale(1.25)' : 'scale(1)', transition: 'transform 0.2s cubic-bezier(0.34,1.56,0.64,1)', display: 'inline-block' }}
+      >
+        {count}
+      </span>
+      <span className="text-slate-400 font-semibold">/ {total} đã trả lời</span>
+    </div>
+  );
+}
+
 function HorizontalOptionStatsChart({
   roundStats,
   options = [],
@@ -226,20 +267,35 @@ export function ProjectorView({
 
   useEffect(() => {
     if (!code) return;
-    const fetchLB = () => {
+
+    const doFetch = () => {
       fetch(`/api/leaderboard/${code}`, { cache: 'no-store' })
         .then((res) => res.json())
         .then((data) => {
-          if (Array.isArray(data)) {
+          if (Array.isArray(data) && data.length > 0) {
             setLeaderboard(data);
           }
         })
         .catch(() => {});
     };
 
-    fetchLB();
-    const interval = setInterval(fetchLB, 2000);
-    return () => clearInterval(interval);
+    doFetch();
+
+    // If finished and leaderboard empty, retry aggressively every 1s
+    if (roomState.status === 'finished') {
+      const id = setInterval(() => {
+        if (leaderboard.length > 0) {
+          clearInterval(id);
+          return;
+        }
+        doFetch();
+      }, 1000);
+      return () => clearInterval(id);
+    }
+
+    // Normal polling every 2s otherwise
+    const id = setInterval(doFetch, 2000);
+    return () => clearInterval(id);
   }, [code, roomState.status, roomState.showRanking, roomState.currentQuestionIndex]);
 
   // Grand celebration confetti for finished screen
@@ -707,7 +763,7 @@ export function ProjectorView({
           </div>
         ) : (
           /* QUESTION DISPLAY VIEW (FULL TEXT, NO TRUNCATE) */
-          <div className="flex-1 flex flex-col justify-between my-auto py-2">
+          <div className="flex-1 flex flex-col justify-between my-auto py-2 relative">
             {/* Question Text */}
             <div className="text-center my-auto px-2">
               <h2 className={`font-black text-slate-900 leading-snug mx-auto max-w-4xl break-words whitespace-normal ${
@@ -752,6 +808,13 @@ export function ProjectorView({
                 })}
               </div>
             )}
+
+            {/* ANSWER COUNT BADGE - góc dưới trái, không che nội dung */}
+            <AnsweredCountBadge
+              count={roundStats?.totalAnswered ?? 0}
+              total={roomState.studentsCount}
+              isMiniPreview={isMiniPreview}
+            />
           </div>
         )}
       </div>

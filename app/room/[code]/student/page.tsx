@@ -45,10 +45,34 @@ export default function StudentPage() {
 
   const [finalLeaderboard, setFinalLeaderboard] = useState<LeaderboardEntry[]>([]);
   const finalLeaderboardFetchedRef = useRef(false);
+  const [rankingLeaderboard, setRankingLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const showRankingRef = useRef(false);
 
   const { roomState, loading } = useRoomPolling(joined ? code : '', 1500);
   const { leaderboard } = useLeaderboard(code);
   const { play } = useSound(soundEnabled);
+
+  // Fetch leaderboard khi showRanking = true (live ranking cho học sinh)
+  useEffect(() => {
+    if (roomState?.showRanking && code) {
+      showRankingRef.current = true;
+      const fetchRankingLB = () => {
+        fetch(`/api/leaderboard/${code}`, { cache: 'no-store' })
+          .then((r) => r.json())
+          .then((data) => {
+            if (Array.isArray(data) && data.length > 0) {
+              setRankingLeaderboard(data);
+            } else {
+              setTimeout(fetchRankingLB, 1000);
+            }
+          })
+          .catch(() => setTimeout(fetchRankingLB, 1500));
+      };
+      fetchRankingLB();
+    } else if (!roomState?.showRanking) {
+      showRankingRef.current = false;
+    }
+  }, [roomState?.showRanking, code]);
 
   // When game finishes, fetch leaderboard directly to guarantee data
   useEffect(() => {
@@ -315,24 +339,65 @@ export default function StudentPage() {
         </div>
       )}
 
-      {/* When Showing Ranking: Show my current standing */}
+      {/* When Showing Ranking: Show my current standing + mini top 5 */}
       {roomState?.showRanking ? (
-        <div className="flex-1 flex flex-col justify-center p-6 text-center animate-bounce-in">
-          <span className="text-6xl mb-3">🏆</span>
-          <h2 className="text-2xl font-black text-brand-yellow mb-1">Bảng Xếp Hạng Vòng Này</h2>
-          <p className="text-slate-400 text-xs mb-4">Điểm số và thứ hạng của bạn</p>
+        <div className="flex-1 flex flex-col justify-start p-4 text-center">
+          <span className="text-5xl mb-2">🏆</span>
+          <h2 className="text-xl font-black text-brand-yellow mb-1">Bảng Xếp Hạng Vòng Này</h2>
+
+          {/* My rank card */}
           {(() => {
-            const myRank = leaderboard.find((e) => e.studentName === studentName);
+            const myRank = rankingLeaderboard.find((e) => e.studentName === studentName);
             return (
-              <div className="bg-slate-800 border-2 border-slate-700 rounded-3xl p-6 shadow-xl mb-4 max-w-sm mx-auto w-full">
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Thứ hạng hiện tại</span>
-                <div className="text-5xl font-black text-brand-yellow mb-2">#{myRank?.rank ?? '-'}</div>
-                <div className="text-2xl font-black text-white">{totalScore.toLocaleString()} pts</div>
-                <p className="text-slate-400 text-xs mt-2">Đúng {myRank?.correctCount ?? 0} câu</p>
+              <div className="bg-slate-800 border-2 border-slate-700 rounded-3xl p-5 shadow-xl mb-3 max-w-sm mx-auto w-full">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Thứ hạng của bạn</span>
+                <div
+                  className={`text-5xl font-black mb-1 ${
+                    myRank?.rank === 1
+                      ? 'text-brand-yellow'
+                      : myRank?.rank === 2
+                      ? 'text-slate-300'
+                      : myRank?.rank === 3
+                      ? 'text-amber-400'
+                      : 'text-white'
+                  }`}
+                >
+                  #{myRank?.rank ?? '?'}
+                </div>
+                <div className="text-2xl font-black text-brand-yellow">{totalScore.toLocaleString()} pts</div>
+                <p className="text-slate-400 text-xs mt-1">Đúng {myRank?.correctCount ?? 0} câu</p>
               </div>
             );
           })()}
-          <p className="text-slate-400 font-bold text-xs">Hãy nhìn lên màn chiếu của giáo viên để xem toàn lớp!</p>
+
+          {/* Mini top 5 leaderboard */}
+          {rankingLeaderboard.length > 0 && (
+            <div className="max-w-sm mx-auto w-full space-y-1.5 mb-3">
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                Top {Math.min(5, rankingLeaderboard.length)} lớp
+              </p>
+              {rankingLeaderboard.slice(0, 5).map((entry, idx) => (
+                <div
+                  key={entry.studentName}
+                  className={`flex items-center gap-2.5 px-3 py-2 rounded-2xl text-xs font-bold border ${
+                    entry.studentName === studentName
+                      ? 'bg-blue-600/40 border-blue-400 text-white ring-1 ring-blue-400'
+                      : idx === 0
+                      ? 'bg-yellow-500/20 border-yellow-500/40 text-yellow-200'
+                      : 'bg-white/5 border-white/10 text-slate-200'
+                  }`}
+                >
+                  <span className="w-5 text-center font-mono">
+                    {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${entry.rank}`}
+                  </span>
+                  <span className="flex-1 truncate text-left">{entry.studentName}</span>
+                  <span className="font-mono text-brand-yellow shrink-0">{entry.totalScore.toLocaleString()}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <p className="text-slate-500 text-xs font-bold">Nhìn lên màn chiếu để xem toàn lớp!</p>
         </div>
       ) : roomState?.questionRevealed ? (
         /* When Revealed: Instant feedback */
