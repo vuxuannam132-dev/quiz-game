@@ -13,6 +13,7 @@ import { ResultFeedback } from '@/components/student/ResultFeedback';
 import { Timer } from '@/components/shared/Timer';
 import { Leaderboard } from '@/components/shared/Leaderboard';
 import { useLeaderboard } from '@/hooks/useLeaderboard';
+import { AudioToggle } from '@/components/shared/AudioToggle';
 import { RoomMode, LeaderboardEntry } from '@/types';
 
 interface AnswerResult {
@@ -36,7 +37,6 @@ export default function StudentPage() {
   const [submitting, setSubmitting] = useState(false);
   const [tabSwitchCount, setTabSwitchCount] = useState(0);
   const [disqualified, setDisqualified] = useState(false);
-  const [soundEnabled, setSoundEnabled] = useState(true);
   const [totalScore, setTotalScore] = useState(0);
   const [joinError, setJoinError] = useState('');
   const [joining, setJoining] = useState(false);
@@ -50,7 +50,7 @@ export default function StudentPage() {
 
   const { roomState, loading } = useRoomPolling(joined ? code : '', 1500);
   const { leaderboard } = useLeaderboard(code);
-  const { play } = useSound(soundEnabled);
+  const { play, soundEnabled, setSoundEnabled, toggleSound } = useSound(true);
 
   // Fetch leaderboard khi showRanking = true (live ranking cho học sinh)
   useEffect(() => {
@@ -137,7 +137,12 @@ export default function StudentPage() {
 
       setJoined(true);
       setRoomMode(data.mode);
-      setSoundEnabled(data.settings?.soundEnabled ?? true);
+      const savedPref = localStorage.getItem('quiz_sound_enabled');
+      if (savedPref !== null) {
+        setSoundEnabled(savedPref === 'true');
+      } else {
+        setSoundEnabled(data.settings?.soundEnabled ?? true);
+      }
       setMonitorEnabled(data.settings?.monitorTabSwitch ?? false);
       if (data.studentName) {
         setStudentName(data.studentName);
@@ -174,6 +179,7 @@ export default function StudentPage() {
     if (selectedAnswer || submitting || !roomState?.currentQuestion) return;
     setSelectedAnswer(answer);
     setSubmitting(true);
+    play('tick');
 
     const timeSpent = Math.max(0.1, Number(((Date.now() - questionStartTimeRef.current) / 1000).toFixed(2)));
     const activeSid = sessionId || (typeof window !== 'undefined' ? localStorage.getItem(`sessionId_${code}`) : '') || '';
@@ -290,6 +296,9 @@ export default function StudentPage() {
           <span className="w-3 h-3 rounded-full bg-green-500 animate-pulse" />
           <span className="font-mono font-black text-brand-dark tracking-widest text-lg">Mã PIN: {code}</span>
         </div>
+
+        {/* Audio Toggle in Lobby */}
+        <AudioToggle soundEnabled={soundEnabled} onToggle={toggleSound} />
       </div>
     );
   }
@@ -328,6 +337,9 @@ export default function StudentPage() {
           </div>
         )}
         <Leaderboard entries={displayLeaderboard} />
+
+        {/* Audio Toggle in Finished */}
+        <AudioToggle soundEnabled={soundEnabled} onToggle={toggleSound} />
       </div>
     );
   }
@@ -453,6 +465,9 @@ export default function StudentPage() {
           )}
         </div>
       ) : null}
+
+      {/* Audio Toggle in Game */}
+      <AudioToggle soundEnabled={soundEnabled} onToggle={toggleSound} />
     </div>
   );
 }

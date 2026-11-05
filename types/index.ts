@@ -186,11 +186,26 @@ export interface UseRoomPollingReturn {
 }
 
 export interface UseSoundReturn {
-  play: (sound: SoundType) => void;
+  play: (sound: SoundType, options?: { loop?: boolean; volume?: number }) => void;
   stop: (sound?: SoundType) => void;
+  playBGM: (bgm: 'lobby' | 'question_battle' | 'victory', volume?: number) => void;
+  stopBGM: () => void;
+  soundEnabled: boolean;
+  setSoundEnabled: (enabled: boolean) => void;
+  toggleSound: () => void;
 }
 
-export type SoundType = 'correct' | 'wrong' | 'countdown' | 'reveal' | 'finish' | 'tick';
+export type SoundType =
+  | 'correct'
+  | 'wrong'
+  | 'countdown'
+  | 'reveal'
+  | 'finish'
+  | 'tick'
+  | 'urgent_tick'
+  | 'question_battle'
+  | 'lobby'
+  | 'victory';
 
 export interface UseLeaderboardReturn {
   leaderboard: LeaderboardEntry[];

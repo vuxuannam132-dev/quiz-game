@@ -1,61 +1,245 @@
 'use client';
 
-import { useRef, useCallback, useEffect } from 'react';
+import { useRef, useCallback, useEffect, useState } from 'react';
 import { SoundType, UseSoundReturn } from '@/types';
 
-// Public domain sound URLs
+// High-performance local sound files located in public/sounds
 const SOUND_URLS: Record<SoundType, string> = {
-  correct: 'https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3',
-  wrong: 'https://assets.mixkit.co/active_storage/sfx/2003/2003-preview.mp3',
-  countdown: 'https://assets.mixkit.co/active_storage/sfx/2004/2004-preview.mp3',
-  reveal: 'https://assets.mixkit.co/active_storage/sfx/888/888-preview.mp3',
-  finish: 'https://assets.mixkit.co/active_storage/sfx/1993/1993-preview.mp3',
-  tick: 'https://assets.mixkit.co/active_storage/sfx/2005/2005-preview.mp3',
+  correct: '/sounds/correct.wav',
+  wrong: '/sounds/wrong.wav',
+  countdown: '/sounds/urgent_tick.wav',
+  reveal: '/sounds/reveal.wav',
+  finish: '/sounds/victory.wav',
+  tick: '/sounds/tick.wav',
+  urgent_tick: '/sounds/urgent_tick.wav',
+  question_battle: '/sounds/question_battle.wav',
+  lobby: '/sounds/lobby.wav',
+  victory: '/sounds/victory.wav',
 };
 
-export function useSound(enabled: boolean): UseSoundReturn {
-  const soundsRef = useRef<Record<string, Howl>>({});
+const BGM_DEFAULTS: Record<string, { volume: number; loop: boolean }> = {
+  lobby: { volume: 0.45, loop: true },
+  question_battle: { volume: 0.55, loop: true },
+  victory: { volume: 0.65, loop: true },
+};
+
+export function useSound(initialEnabled: boolean = true): UseSoundReturn {
+  // Read preference from localStorage if previously set, fallback to initialEnabled
+  const [soundEnabled, setSoundEnabledState] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('quiz_sound_enabled');
+      if (saved !== null) {
+        return saved === 'true';
+      }
+    }
+    return initialEnabled;
+  });
+
+  const soundsRef = useRef<Record<string, any>>({});
   const isLoadedRef = useRef(false);
+  const currentBgmRef = useRef<'lobby' | 'question_battle' | 'victory' | null>(null);
+  const soundEnabledRef = useRef(soundEnabled);
+
+  // Keep ref synced for callbacks
+  useEffect(() => {
+    soundEnabledRef.current = soundEnabled;
+  }, [soundEnabled]);
+
+  // Set sound enabled with localStorage persistence
+  const setSoundEnabled = useCallback((enabled: boolean) => {
+    setSoundEnabledState(enabled);
+    soundEnabledRef.current = enabled;
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('quiz_sound_enabled', enabled ? 'true' : 'false');
+    }
+
+    if (!enabled) {
+      // Immediately stop all sounds and BGM
+      Object.values(soundsRef.current).forEach((howl) => {
+        try {
+          howl.stop();
+        } catch {}
+      });
+    } else {
+      // Resume current BGM if one was active
+      const activeBgm = currentBgmRef.current;
+      if (activeBgm && soundsRef.current[activeBgm]) {
+        try {
+          const howl = soundsRef.current[activeBgm];
+          if (!howl.playing()) {
+            howl.play();
+          }
+        } catch {}
+      }
+    }
+  }, []);
+
+  const toggleSound = useCallback(() => {
+    setSoundEnabled(!soundEnabledRef.current);
+  }, [setSoundEnabled]);
+
+  // Unlock browser audio context on first interaction
+  const unlockAudioContext = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      import('howler').then(({ Howler }) => {
+        if (Howler && Howler.ctx && Howler.ctx.state === 'suspended') {
+          Howler.ctx.resume().catch(() => {});
+        }
+      });
+    } catch {}
+  }, []);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleFirstInteraction = () => {
+      unlockAudioContext();
+      window.removeEventListener('click', handleFirstInteraction);
+      window.removeEventListener('keydown', handleFirstInteraction);
+      window.removeEventListener('touchstart', handleFirstInteraction);
+    };
+
+    window.addEventListener('click', handleFirstInteraction, { passive: true });
+    window.addEventListener('keydown', handleFirstInteraction, { passive: true });
+    window.addEventListener('touchstart', handleFirstInteraction, { passive: true });
+
+    return () => {
+      window.removeEventListener('click', handleFirstInteraction);
+      window.removeEventListener('keydown', handleFirstInteraction);
+      window.removeEventListener('touchstart', handleFirstInteraction);
+    };
+  }, [unlockAudioContext]);
+
+  // Load Howler and initialize sound objects
+  useEffect(() => {
     if (typeof window === 'undefined' || isLoadedRef.current) return;
-    
+
     const loadHowler = async () => {
-      const { Howl } = await import('howler');
-      isLoadedRef.current = true;
-      
-      Object.entries(SOUND_URLS).forEach(([key, url]) => {
-        soundsRef.current[key] = new Howl({
-          src: [url],
-          volume: 0.7,
-          preload: false,
-          html5: true,
+      try {
+        const { Howl, Howler } = await import('howler');
+        isLoadedRef.current = true;
+
+        // Auto-unlock audio for mobile and desktop browsers
+        Howler.autoUnlock = true;
+
+        Object.entries(SOUND_URLS).forEach(([key, url]) => {
+          const isBgm = key in BGM_DEFAULTS;
+          const config = BGM_DEFAULTS[key] || { volume: 0.7, loop: false };
+
+          soundsRef.current[key] = new Howl({
+            src: [url],
+            volume: config.volume,
+            loop: config.loop,
+            preload: true,
+            html5: isBgm, // Stream longer BGM files smoothly
+          });
         });
-      });
+
+        // If a BGM was requested prior to load, start it now
+        if (soundEnabledRef.current && currentBgmRef.current) {
+          const bgm = currentBgmRef.current;
+          soundsRef.current[bgm]?.play();
+        }
+      } catch (e) {
+        console.error('Failed to initialize audio engine:', e);
+      }
     };
 
     loadHowler();
+
+    return () => {
+      // Cleanup on unmount
+      Object.values(soundsRef.current).forEach((h) => {
+        try {
+          h.stop();
+        } catch {}
+      });
+    };
   }, []);
 
+  // Play sound effect with optional loop / custom volume
   const play = useCallback(
-    (sound: SoundType) => {
-      if (!enabled || typeof window === 'undefined') return;
-      
+    (sound: SoundType, options?: { loop?: boolean; volume?: number }) => {
+      if (!soundEnabledRef.current || typeof window === 'undefined') return;
+      unlockAudioContext();
+
       const howl = soundsRef.current[sound];
       if (howl) {
+        if (options?.volume !== undefined) howl.volume(options.volume);
+        if (options?.loop !== undefined) howl.loop(options.loop);
         howl.play();
       }
     },
-    [enabled]
+    [unlockAudioContext]
   );
 
+  // Stop specific sound or all sounds
   const stop = useCallback((sound?: SoundType) => {
     if (sound) {
       soundsRef.current[sound]?.stop();
     } else {
-      Object.values(soundsRef.current).forEach((h) => h.stop());
+      Object.values(soundsRef.current).forEach((h) => {
+        try {
+          h.stop();
+        } catch {}
+      });
     }
   }, []);
 
-  return { play, stop };
+  // Dedicated Background Music Orchestrator
+  const playBGM = useCallback(
+    (bgm: 'lobby' | 'question_battle' | 'victory', volume?: number) => {
+      if (typeof window === 'undefined') return;
+      unlockAudioContext();
+
+      // If already playing this BGM, don't restart from beginning
+      if (currentBgmRef.current === bgm && soundsRef.current[bgm]?.playing()) {
+        return;
+      }
+
+      // Stop any previously playing BGM
+      const oldBgm = currentBgmRef.current;
+      if (oldBgm && oldBgm !== bgm && soundsRef.current[oldBgm]) {
+        try {
+          soundsRef.current[oldBgm].stop();
+        } catch {}
+      }
+
+      currentBgmRef.current = bgm;
+
+      if (!soundEnabledRef.current) return;
+
+      const howl = soundsRef.current[bgm];
+      if (howl) {
+        const defaultVol = BGM_DEFAULTS[bgm]?.volume ?? 0.5;
+        howl.volume(volume ?? defaultVol);
+        howl.loop(true);
+        if (!howl.playing()) {
+          howl.play();
+        }
+      }
+    },
+    [unlockAudioContext]
+  );
+
+  const stopBGM = useCallback(() => {
+    const bgm = currentBgmRef.current;
+    if (bgm && soundsRef.current[bgm]) {
+      try {
+        soundsRef.current[bgm].stop();
+      } catch {}
+    }
+    currentBgmRef.current = null;
+  }, []);
+
+  return {
+    play,
+    stop,
+    playBGM,
+    stopBGM,
+    soundEnabled,
+    setSoundEnabled,
+    toggleSound,
+  };
 }

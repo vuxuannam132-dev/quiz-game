@@ -13,6 +13,7 @@ interface ProjectorViewProps {
   code: string;
   leaderboard?: LeaderboardEntry[];
   isMiniPreview?: boolean;
+  onTickSound?: (remaining: number) => void;
 }
 
 const KAHOOT_COLORS = [
@@ -255,6 +256,7 @@ export function ProjectorView({
   code,
   leaderboard: externalLeaderboard = [],
   isMiniPreview = false,
+  onTickSound,
 }: ProjectorViewProps) {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>(externalLeaderboard);
   const [refreshing, setRefreshing] = useState(false);
@@ -704,6 +706,7 @@ export function ProjectorView({
                 resetKey={roomState.currentQuestionIndex}
                 timeLimit={roomState.settings.timeLimit}
                 onTimeUp={() => {}}
+                onTick={(sec) => onTickSound?.(sec)}
                 isRunning={roomState.status === 'playing' && !roomState.questionRevealed}
               />
             </div>

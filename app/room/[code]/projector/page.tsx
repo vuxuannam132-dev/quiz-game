@@ -6,28 +6,64 @@ import { useRoomPolling } from '@/hooks/useRoomPolling';
 import { useLeaderboard } from '@/hooks/useLeaderboard';
 import { useSound } from '@/hooks/useSound';
 import { ProjectorView } from '@/components/projector/ProjectorView';
+import { AudioToggle } from '@/components/shared/AudioToggle';
 
 export default function ProjectorPage() {
   const params = useParams();
   const code = (params.code as string).toUpperCase();
   const { roomState, loading } = useRoomPolling(code, 1500);
   const { leaderboard, refresh: refreshLeaderboard } = useLeaderboard(code);
-  const soundEnabled = roomState?.settings?.soundEnabled ?? true;
-  const { play } = useSound(soundEnabled);
 
+  const {
+    play,
+    playBGM,
+    stopBGM,
+    soundEnabled,
+    toggleSound,
+  } = useSound(true);
+
+  // Background Music Orchestration based on current room state
   useEffect(() => {
-    if (roomState?.questionRevealed || roomState?.showRanking) {
+    if (!roomState) return;
+
+    if (roomState.status === 'waiting') {
+      playBGM('lobby');
+    } else if (roomState.status === 'playing') {
+      if (roomState.showRanking || roomState.questionRevealed) {
+        stopBGM();
+      } else {
+        // While question is active: play dramatic countdown battle music
+        playBGM('question_battle');
+      }
+    } else if (roomState.status === 'finished') {
+      playBGM('victory');
+    } else {
+      stopBGM();
+    }
+  }, [
+    roomState?.status,
+    roomState?.currentQuestionIndex,
+    roomState?.questionRevealed,
+    roomState?.showRanking,
+    playBGM,
+    stopBGM,
+  ]);
+
+  // Trigger SFX on reveal
+  useEffect(() => {
+    if (roomState?.questionRevealed) {
       play('reveal');
       refreshLeaderboard();
     }
-  }, [roomState?.questionRevealed, roomState?.showRanking]);
+  }, [roomState?.questionRevealed, play, refreshLeaderboard]);
 
+  // Trigger SFX on finish
   useEffect(() => {
     if (roomState?.status === 'finished') {
       play('finish');
       refreshLeaderboard();
     }
-  }, [roomState?.status]);
+  }, [roomState?.status, play, refreshLeaderboard]);
 
   if (loading && !roomState) {
     return (
@@ -51,13 +87,21 @@ export default function ProjectorPage() {
   }
 
   return (
-    <div className="min-h-screen bg-brand-bg select-none">
+    <div className="min-h-screen bg-brand-bg select-none relative">
       <ProjectorView
         roomState={roomState}
         code={code}
         leaderboard={leaderboard}
         isMiniPreview={false}
+        onTickSound={(sec) => {
+          if (sec <= 5 && sec > 0) {
+            play('urgent_tick');
+          }
+        }}
       />
+
+      {/* Floating Audio Toggle placed at bottom-left corner of the screen */}
+      <AudioToggle soundEnabled={soundEnabled} onToggle={toggleSound} />
     </div>
   );
 }

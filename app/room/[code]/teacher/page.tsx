@@ -7,6 +7,8 @@ import { useLeaderboard } from '@/hooks/useLeaderboard';
 import { ControlPanel } from '@/components/teacher/ControlPanel';
 import { Leaderboard } from '@/components/shared/Leaderboard';
 import { ProjectorView } from '@/components/projector/ProjectorView';
+import { useSound } from '@/hooks/useSound';
+import { AudioToggle } from '@/components/shared/AudioToggle';
 
 export default function TeacherPage() {
   const params = useParams();
@@ -15,7 +17,56 @@ export default function TeacherPage() {
   const { roomState, loading, refresh } = useRoomPolling(code, 1500);
   const { leaderboard, refresh: refreshLB } = useLeaderboard(code);
 
+  const {
+    play,
+    playBGM,
+    stopBGM,
+    soundEnabled,
+    toggleSound,
+  } = useSound(true);
+
   const [projectorWindow, setProjectorWindow] = useState<Window | null>(null);
+
+  // Background Music Orchestration based on current room state
+  useEffect(() => {
+    if (!roomState) return;
+
+    if (roomState.status === 'waiting') {
+      playBGM('lobby');
+    } else if (roomState.status === 'playing') {
+      if (roomState.showRanking || roomState.questionRevealed) {
+        stopBGM();
+      } else {
+        // While question is active: play dramatic countdown battle music
+        playBGM('question_battle');
+      }
+    } else if (roomState.status === 'finished') {
+      playBGM('victory');
+    } else {
+      stopBGM();
+    }
+  }, [
+    roomState?.status,
+    roomState?.currentQuestionIndex,
+    roomState?.questionRevealed,
+    roomState?.showRanking,
+    playBGM,
+    stopBGM,
+  ]);
+
+  // Trigger SFX on reveal
+  useEffect(() => {
+    if (roomState?.questionRevealed) {
+      play('reveal');
+    }
+  }, [roomState?.questionRevealed, play]);
+
+  // Trigger SFX on finish
+  useEffect(() => {
+    if (roomState?.status === 'finished') {
+      play('finish');
+    }
+  }, [roomState?.status, play]);
 
   const handleAction = useCallback(async (action: string) => {
     try {
@@ -174,6 +225,11 @@ export default function TeacherPage() {
                   code={code}
                   leaderboard={leaderboard}
                   isMiniPreview={true}
+                  onTickSound={(sec) => {
+                    if (sec <= 5 && sec > 0) {
+                      play('urgent_tick');
+                    }
+                  }}
                 />
               </div>
 
@@ -257,6 +313,9 @@ export default function TeacherPage() {
           </div>
         </div>
       </div>
+
+      {/* Floating Audio Toggle placed at bottom-left corner */}
+      <AudioToggle soundEnabled={soundEnabled} onToggle={toggleSound} />
     </div>
   );
 }
