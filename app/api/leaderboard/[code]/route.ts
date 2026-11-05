@@ -1,31 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import { rooms, gameSessions } from '@/lib/schema';
-import { eq } from 'drizzle-orm';
+import { neon } from '@neondatabase/serverless';
 import { LeaderboardEntry } from '@/types';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest, { params }: { params: { code: string } }) {
   try {
     const code = params.code.toUpperCase().trim();
-    console.log('[LEADERBOARD DEBUG] code:', code);
-    console.log('[LEADERBOARD DEBUG] DATABASE_URL prefix:', process.env.DATABASE_URL?.slice(0, 60));
+    const sql = neon(process.env.DATABASE_URL!);
 
-    const [room] = await db.select().from(rooms).where(eq(rooms.code, code)).limit(1);
-    console.log('[LEADERBOARD DEBUG] room found:', !!room, 'status:', room?.status);
-    console.log('[LEADERBOARD DEBUG] room.students:', JSON.stringify(room?.students));
+    // 1. Fetch room using raw SQL for maximum reliability
+    const roomRows = await sql`
+      SELECT code, status, students 
+      FROM rooms 
+      WHERE code = ${code} 
+      LIMIT 1
+    `;
 
-    if (!room) return NextResponse.json({ error: 'Phòng không tồn tại' }, { status: 404 });
-
-    let sessions: any[] = [];
-    try {
-      sessions = await db.select().from(gameSessions).where(eq(gameSessions.roomCode, code));
-      console.log('[LEADERBOARD DEBUG] sessions count:', sessions.length);
-      console.log('[LEADERBOARD DEBUG] sessions data:', JSON.stringify(sessions.map(s => ({ studentName: s.studentName, totalScore: s.totalScore, roomCode: s.roomCode }))));
-    } catch (sessionErr: any) {
-      console.error('[LEADERBOARD DEBUG] sessions query THREW:', sessionErr?.message);
+    if (!roomRows || roomRows.length === 0) {
+      return NextResponse.json({ error: 'Phòng không tồn tại' }, { status: 404 });
     }
 
-    // Map existing sessions
+    const room = roomRows[0];
+
+    // 2. Fetch game sessions using raw SQL
+    const sessions = await sql`
+      SELECT student_name, session_id, total_score, answers, submitted_at, disqualified
+      FROM game_sessions 
+      WHERE room_code = ${code}
+    `;
+
+    // 3. Map existing sessions
     const playerMap = new Map<string, {
       studentName: string;
       totalScore: number;
@@ -35,51 +40,73 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
       disqualified?: boolean;
     }>();
 
-    sessions.forEach((s) => {
-      const answers = (s.answers ?? []) as Array<{
+    for (const s of sessions) {
+      let answers: Array<{
         questionId: string;
         answer: string;
         correct: boolean;
         timeSpent: number;
         points: number;
-      }>;
+      }> = [];
 
-      const correctCount = answers.filter((a) => a.correct).length;
-      const totalTimeSpent = answers.reduce((acc, a) => acc + (Number(a.timeSpent) || 0), 0);
-      const score = Number(s.totalScore) || 0;
+      try {
+        if (typeof s.answers === 'string') {
+          answers = JSON.parse(s.answers);
+        } else if (Array.isArray(s.answers)) {
+          answers = s.answers;
+        }
+      } catch {
+        answers = [];
+      }
 
-      const existing = playerMap.get(s.studentName);
+      const correctCount = answers.filter((a) => a && a.correct).length;
+      const totalTimeSpent = answers.reduce((acc, a) => acc + (Number(a?.timeSpent) || 0), 0);
+      const score = Number(s.total_score) || 0;
+      const studentName = String(s.student_name || '').trim();
+
+      if (!studentName) continue;
+
+      const existing = playerMap.get(studentName);
       if (!existing || score > existing.totalScore) {
-        playerMap.set(s.studentName, {
-          studentName: s.studentName,
+        playerMap.set(studentName, {
+          studentName,
           totalScore: score,
           correctCount,
           totalTimeSpent: Number(totalTimeSpent.toFixed(2)),
-          submittedAt: s.submittedAt ? new Date(s.submittedAt).getTime() : 0,
-          disqualified: s.disqualified,
+          submittedAt: s.submitted_at ? new Date(s.submitted_at).getTime() : 0,
+          disqualified: Boolean(s.disqualified),
         });
       }
-    });
+    }
 
-    // Also include any students in room.students who may not have a session yet
-    const studentsInRoom = (room?.students ?? []) as Array<{ name: string; sessionId: string }>;
-    console.log('[LEADERBOARD DEBUG] studentsInRoom count:', studentsInRoom.length);
-    studentsInRoom.forEach((stu) => {
-      if (stu.name && !playerMap.has(stu.name)) {
-        playerMap.set(stu.name, {
-          studentName: stu.name,
+    // 4. Also include any students in room.students who may not have a session yet
+    let studentsInRoom: Array<{ name?: string; sessionId?: string }> = [];
+    try {
+      if (typeof room.students === 'string') {
+        studentsInRoom = JSON.parse(room.students);
+      } else if (Array.isArray(room.students)) {
+        studentsInRoom = room.students;
+      }
+    } catch {
+      studentsInRoom = [];
+    }
+
+    for (const stu of studentsInRoom) {
+      const name = String(stu?.name || '').trim();
+      if (name && !playerMap.has(name)) {
+        playerMap.set(name, {
+          studentName: name,
           totalScore: 0,
           correctCount: 0,
           totalTimeSpent: 0,
           submittedAt: 0,
         });
       }
-    });
+    }
 
     const mapped = Array.from(playerMap.values());
-    console.log('[LEADERBOARD DEBUG] playerMap size:', playerMap.size, 'mapped:', mapped.length);
 
-    // Sort: 1) totalScore DESC, 2) totalTimeSpent ASC (tie-break), 3) submittedAt ASC
+    // 5. Sort: 1) totalScore DESC, 2) totalTimeSpent ASC (tie-break), 3) submittedAt ASC
     mapped.sort((a, b) => {
       if (b.totalScore !== a.totalScore) {
         return b.totalScore - a.totalScore;
@@ -98,10 +125,9 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
       totalTimeSpent: item.totalTimeSpent,
     }));
 
-    console.log('[LEADERBOARD DEBUG] returning leaderboard size:', leaderboard.length);
     return NextResponse.json(leaderboard);
   } catch (e: any) {
-    console.error('[LEADERBOARD DEBUG] CAUGHT ERROR:', e?.message, e?.stack);
+    console.error('Leaderboard error:', e);
     return NextResponse.json({ error: 'Lỗi lấy bảng xếp hạng: ' + e.message }, { status: 500 });
   }
 }
