@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useRoomPolling } from '@/hooks/useRoomPolling';
 import { useLeaderboard } from '@/hooks/useLeaderboard';
@@ -25,6 +25,8 @@ export default function TeacherPage() {
     toggleSound,
   } = useSound(true);
 
+  const prevRevealedRef = useRef(false);
+  const prevFinishedRef = useRef(false);
   const [projectorWindow, setProjectorWindow] = useState<Window | null>(null);
 
   // Background Music Orchestration based on current room state
@@ -54,18 +56,22 @@ export default function TeacherPage() {
     stopBGM,
   ]);
 
-  // Trigger SFX on reveal
+  // Trigger SFX on reveal (exactly once per transition)
   useEffect(() => {
-    if (roomState?.questionRevealed) {
+    const isRevealed = Boolean(roomState?.questionRevealed);
+    if (isRevealed && !prevRevealedRef.current) {
       play('reveal');
     }
+    prevRevealedRef.current = isRevealed;
   }, [roomState?.questionRevealed, play]);
 
-  // Trigger SFX on finish
+  // Trigger SFX on finish (exactly once per transition)
   useEffect(() => {
-    if (roomState?.status === 'finished') {
+    const isFinished = roomState?.status === 'finished';
+    if (isFinished && !prevFinishedRef.current) {
       play('finish');
     }
+    prevFinishedRef.current = isFinished;
   }, [roomState?.status, play]);
 
   const handleAction = useCallback(async (action: string) => {

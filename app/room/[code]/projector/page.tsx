@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { useRoomPolling } from '@/hooks/useRoomPolling';
 import { useLeaderboard } from '@/hooks/useLeaderboard';
@@ -21,6 +21,9 @@ export default function ProjectorPage() {
     soundEnabled,
     toggleSound,
   } = useSound(true);
+
+  const prevRevealedRef = useRef(false);
+  const prevFinishedRef = useRef(false);
 
   // Background Music Orchestration based on current room state
   useEffect(() => {
@@ -49,20 +52,24 @@ export default function ProjectorPage() {
     stopBGM,
   ]);
 
-  // Trigger SFX on reveal
+  // Trigger SFX on reveal (exactly once per transition)
   useEffect(() => {
-    if (roomState?.questionRevealed) {
+    const isRevealed = Boolean(roomState?.questionRevealed);
+    if (isRevealed && !prevRevealedRef.current) {
       play('reveal');
       refreshLeaderboard();
     }
+    prevRevealedRef.current = isRevealed;
   }, [roomState?.questionRevealed, play, refreshLeaderboard]);
 
-  // Trigger SFX on finish
+  // Trigger SFX on finish (exactly once per transition)
   useEffect(() => {
-    if (roomState?.status === 'finished') {
+    const isFinished = roomState?.status === 'finished';
+    if (isFinished && !prevFinishedRef.current) {
       play('finish');
       refreshLeaderboard();
     }
+    prevFinishedRef.current = isFinished;
   }, [roomState?.status, play, refreshLeaderboard]);
 
   if (loading && !roomState) {

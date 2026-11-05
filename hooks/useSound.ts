@@ -5,16 +5,16 @@ import { SoundType, UseSoundReturn } from '@/types';
 
 // High-performance local sound files located in public/sounds
 const SOUND_URLS: Record<SoundType, string> = {
-  correct: '/sounds/correct.wav',
-  wrong: '/sounds/wrong.wav',
-  countdown: '/sounds/urgent_tick.wav',
-  reveal: '/sounds/reveal.wav',
-  finish: '/sounds/victory.wav',
-  tick: '/sounds/tick.wav',
-  urgent_tick: '/sounds/urgent_tick.wav',
-  question_battle: '/sounds/question_battle.wav',
-  lobby: '/sounds/lobby.wav',
-  victory: '/sounds/victory.wav',
+  correct: '/sounds/correct.wav?v=2',
+  wrong: '/sounds/wrong.wav?v=2',
+  countdown: '/sounds/urgent_tick.wav?v=2',
+  reveal: '/sounds/reveal.wav?v=2',
+  finish: '/sounds/victory.wav?v=2',
+  tick: '/sounds/tick.wav?v=2',
+  urgent_tick: '/sounds/urgent_tick.wav?v=2',
+  question_battle: '/sounds/question_battle.wav?v=2',
+  lobby: '/sounds/lobby.wav?v=2',
+  victory: '/sounds/victory.wav?v=2',
 };
 
 const BGM_DEFAULTS: Record<string, { volume: number; loop: boolean }> = {
