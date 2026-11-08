@@ -38,6 +38,7 @@ export async function POST(req: NextRequest) {
 
     const [newRoom] = await db.insert(rooms).values({
       code,
+      adminCode: crypto.randomUUID(),
       name: name?.trim() || '',
       coverImage: coverImage || null,
       createdBy: (session.user as any).id,

@@ -50,6 +50,7 @@ export const questions = pgTable('questions', {
 export const rooms = pgTable('rooms', {
   id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
   code: text('code').notNull().unique(),
+  adminCode: text('admin_code').$defaultFn(() => crypto.randomUUID()),
   name: text('name').default(''),
   coverImage: text('cover_image'),
   createdBy: text('created_by').notNull().references(() => users.id, { onDelete: 'cascade' }),

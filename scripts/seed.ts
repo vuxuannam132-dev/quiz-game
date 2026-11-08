@@ -50,7 +50,7 @@ async function seed() {
     CREATE TABLE IF NOT EXISTS rooms (
       id TEXT PRIMARY KEY,
       code TEXT NOT NULL UNIQUE,
-      admin_code TEXT NOT NULL UNIQUE,
+      admin_code TEXT,
       created_by TEXT NOT NULL,
       question_ids TEXT[] DEFAULT '{}',
       mode TEXT NOT NULL,
