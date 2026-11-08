@@ -3,6 +3,7 @@
 import { motion } from 'framer-motion';
 import { IQuestion } from '@/types';
 import { useEffect, useRef } from 'react';
+import { isAnswerCorrect } from '@/lib/gameLogic';
 
 interface AnswerRevealProps {
   question: Partial<IQuestion>;
@@ -52,7 +53,13 @@ export function AnswerReveal({ question, onRevealComplete, skipEffects }: Answer
       {question.options && question.options.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {question.options.map((option, idx) => {
-            const isCorrect = option.key === question.correctAnswer;
+            const isCorrect = isAnswerCorrect(
+              question.type || '',
+              option.key,
+              question.correctAnswer || '',
+              undefined,
+              question.options
+            );
             const style = KAHOOT_COLORS[idx % KAHOOT_COLORS.length];
             return (
               <motion.div

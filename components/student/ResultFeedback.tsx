@@ -53,7 +53,13 @@ export function ResultFeedback({ correct, points, correctAnswer, explanation }: 
       {!correct && correctAnswer && (
         <div className="bg-blue-900/30 border border-blue-500/30 rounded-xl p-4">
           <p className="text-blue-300 text-sm font-bold mb-1">Đáp án đúng:</p>
-          <p className="text-white font-bold">{correctAnswer}</p>
+          <p className="text-white font-bold">
+            {correctAnswer === 'T' || correctAnswer === 'True' || correctAnswer === 'Đúng'
+              ? '✅ Đúng'
+              : correctAnswer === 'F' || correctAnswer === 'False' || correctAnswer === 'Sai'
+              ? '❌ Sai'
+              : correctAnswer}
+          </p>
         </div>
       )}
 

@@ -16,7 +16,13 @@ export async function POST(req: NextRequest) {
     const [question] = await db.select().from(questions).where(eq(questions.id, questionId)).limit(1);
     if (!question) return NextResponse.json({ error: 'Câu hỏi không tồn tại' }, { status: 404 });
 
-    const correct = isAnswerCorrect(question.type, answer, question.correctAnswer ?? '', question.matchingPairs ?? undefined);
+    const correct = isAnswerCorrect(
+      question.type,
+      answer,
+      question.correctAnswer ?? '',
+      question.matchingPairs ?? undefined,
+      (question.options as any) ?? undefined
+    );
     const points = calculateScore({ correct, timeSpent: timeSpent ?? 0, timeLimit: room.settings?.timeLimit ?? undefined });
 
     let [session] = await db.select().from(gameSessions)

@@ -362,8 +362,17 @@ export default function StudentPage() {
             <div className="flex-1 flex flex-col items-center justify-center p-8 text-center animate-bounce-in">
               <span className="text-7xl mb-4">✋</span>
               <h2 className="text-3xl font-black mb-2">Đã chọn đáp án:</h2>
-              <div className="inline-block bg-white text-slate-900 px-8 py-3 rounded-2xl text-4xl font-black shadow-2xl mb-4">
-                {selectedAnswer}
+              <div className="inline-block bg-white text-slate-900 px-8 py-3 rounded-2xl text-3xl font-black shadow-2xl mb-4 max-w-xs break-words">
+                {(() => {
+                  const q = roomState.currentQuestion as any;
+                  if (q?.type === 'true_false') {
+                    if (selectedAnswer === 'T' || selectedAnswer === 'A' || selectedAnswer === 'True' || selectedAnswer === 'Đúng') return '✅ Đúng';
+                    if (selectedAnswer === 'F' || selectedAnswer === 'B' || selectedAnswer === 'False' || selectedAnswer === 'Sai') return '❌ Sai';
+                  }
+                  const opt = q?.options?.find((o: any) => o.key === selectedAnswer);
+                  if (opt?.text) return `${selectedAnswer} - ${opt.text}`;
+                  return selectedAnswer;
+                })()}
               </div>
               <p className="text-slate-400 font-bold text-sm">Chờ giáo viên công bố kết quả nhé...</p>
             </div>

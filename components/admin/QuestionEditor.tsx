@@ -4,6 +4,7 @@ import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { IQuestion, QuestionType, IQuestionOption, IMatchingPair } from '@/types';
 import { ImageUploader } from './ImageUploader';
+import { isTrueFalseMatch } from '@/lib/gameLogic';
 
 interface QuestionEditorProps {
   initial?: Partial<IQuestion>;
@@ -101,7 +102,7 @@ export function QuestionEditor({ initial, setId, onSave, onCancel }: QuestionEdi
           { key: 'T', text: 'Đúng' },
           { key: 'F', text: 'Sai' },
         ];
-        data.correctAnswer = correctAnswer;
+        data.correctAnswer = isTrueFalseMatch(correctAnswer, 'F') ? 'F' : 'T';
       } else if (type === 'matching') {
         data.matchingPairs = matchingPairs.map((p) => ({
           left: p.left.trim(),
@@ -184,6 +185,11 @@ export function QuestionEditor({ initial, setId, onSave, onCancel }: QuestionEdi
               onClick={() => {
                 setType(t.value);
                 setErrors({});
+                if (t.value === 'true_false' && !isTrueFalseMatch(correctAnswer, 'T') && !isTrueFalseMatch(correctAnswer, 'F')) {
+                  setCorrectAnswer('T');
+                } else if (t.value === 'multiple_choice' && (correctAnswer === 'T' || correctAnswer === 'F')) {
+                  setCorrectAnswer('A');
+                }
               }}
               className={`px-4 py-2.5 rounded-2xl text-xs font-black transition-all ${
                 type === t.value
@@ -317,7 +323,7 @@ export function QuestionEditor({ initial, setId, onSave, onCancel }: QuestionEdi
               type="button"
               onClick={() => setCorrectAnswer('T')}
               className={`p-4 rounded-2xl border-2 font-black text-base transition-all flex items-center justify-center gap-2 ${
-                correctAnswer === 'T'
+                isTrueFalseMatch(correctAnswer, 'T')
                   ? 'border-brand-green bg-green-50 text-green-700 shadow-md ring-2 ring-brand-green'
                   : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
               }`}
@@ -328,7 +334,7 @@ export function QuestionEditor({ initial, setId, onSave, onCancel }: QuestionEdi
               type="button"
               onClick={() => setCorrectAnswer('F')}
               className={`p-4 rounded-2xl border-2 font-black text-base transition-all flex items-center justify-center gap-2 ${
-                correctAnswer === 'F'
+                isTrueFalseMatch(correctAnswer, 'F')
                   ? 'border-brand-red bg-red-50 text-brand-red shadow-md ring-2 ring-brand-red'
                   : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
               }`}

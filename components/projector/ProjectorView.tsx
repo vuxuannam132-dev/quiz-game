@@ -6,7 +6,7 @@ import { RoomStateResponse, LeaderboardEntry } from '@/types';
 import { QRCodeSVG } from 'qrcode.react';
 import { QRDownloadButtons } from '@/components/shared/QRDownloadButtons';
 import { Timer } from '@/components/shared/Timer';
-import { formatScore, getRankSuffix } from '@/lib/gameLogic';
+import { formatScore, getRankSuffix, isAnswerCorrect, isTrueFalseMatch, isTrueValue, isFalseValue } from '@/lib/gameLogic';
 
 interface ProjectorViewProps {
   roomState: RoomStateResponse;
@@ -27,6 +27,7 @@ interface HorizontalOptionStatsChartProps {
   roundStats?: any;
   options?: Array<{ key: string; text: string }>;
   correctAnswer?: string;
+  questionType?: string;
   isMiniPreview?: boolean;
   theme?: 'dark' | 'light';
 }
@@ -76,6 +77,7 @@ function HorizontalOptionStatsChart({
   roundStats,
   options = [],
   correctAnswer,
+  questionType,
   isMiniPreview = false,
   theme = 'dark',
 }: HorizontalOptionStatsChartProps) {
@@ -180,8 +182,13 @@ function HorizontalOptionStatsChart({
           const opt = options.find((o) => o.key === key);
           const count = roundStats?.optionCounts?.[key] ?? 0;
           const pct = totalAns > 0 ? Math.round((count / totalAns) * 100) : 0;
-          const isCorrect = correctAnswer === key;
-          const style = KAHOOT_COLORS[idx % KAHOOT_COLORS.length];
+          const isCorrect = isAnswerCorrect(questionType || '', key, correctAnswer || '', undefined, options);
+          const isTF = questionType === 'true_false';
+          const isTrueOpt = isTF && (isTrueValue(key) || isTrueValue(opt?.text));
+          const isFalseOpt = isTF && (isFalseValue(key) || isFalseValue(opt?.text));
+          const style = isTF
+            ? (isTrueOpt ? KAHOOT_COLORS[0] : isFalseOpt ? KAHOOT_COLORS[1] : KAHOOT_COLORS[idx % KAHOOT_COLORS.length])
+            : KAHOOT_COLORS[idx % KAHOOT_COLORS.length];
 
           return (
             <div
@@ -623,6 +630,7 @@ export function ProjectorView({
             roundStats={roundStats}
             options={currentQ?.options}
             correctAnswer={currentQ?.correctAnswer}
+            questionType={currentQ?.type}
             isMiniPreview={isMiniPreview}
             theme="dark"
           />

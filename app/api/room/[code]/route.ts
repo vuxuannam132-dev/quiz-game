@@ -5,6 +5,7 @@ import { db } from '@/lib/db';
 import { rooms, questions, gameSessions } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 import { getRoomStateFromCache, setRoomStateInCache, invalidateRoomCache } from '@/lib/redis';
+import { isTrueFalseMatch } from '@/lib/gameLogic';
 import { RoundStats } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -57,7 +58,17 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
       let totalAnswered = 0;
       let correctCount = 0;
       let wrongCount = 0;
-      const optionCounts: Record<string, number> = { A: 0, B: 0, C: 0, D: 0 };
+      const qOptions = (currentQuestion as any).options as Array<{ key: string; text: string }> | undefined;
+      const isTF = (currentQuestion as any).type === 'true_false';
+      const optionCounts: Record<string, number> = {};
+      if (qOptions && qOptions.length > 0) {
+        qOptions.forEach((o) => { optionCounts[o.key] = 0; });
+      } else if (isTF) {
+        optionCounts['T'] = 0;
+        optionCounts['F'] = 0;
+      } else {
+        ['A', 'B', 'C', 'D'].forEach((k) => { optionCounts[k] = 0; });
+      }
 
       sessions.forEach((s) => {
         const answers = (s.answers ?? []) as Array<{ questionId: string; answer: string; correct: boolean }>;
@@ -67,7 +78,17 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
           if (ans.correct) correctCount++;
           else wrongCount++;
           if (ans.answer) {
-            optionCounts[ans.answer] = (optionCounts[ans.answer] || 0) + 1;
+            let key = ans.answer;
+            if (isTF) {
+              if (qOptions && qOptions.length > 0) {
+                const opt = qOptions.find((o) => o.key === ans.answer || isTrueFalseMatch(o.key, ans.answer) || isTrueFalseMatch(o.text, ans.answer));
+                if (opt) key = opt.key;
+                else key = isTrueFalseMatch(ans.answer, 'T') ? 'T' : 'F';
+              } else {
+                key = isTrueFalseMatch(ans.answer, 'T') ? 'T' : 'F';
+              }
+            }
+            optionCounts[key] = (optionCounts[key] || 0) + 1;
           }
         }
       });

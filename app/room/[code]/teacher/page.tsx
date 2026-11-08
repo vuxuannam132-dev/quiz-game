@@ -9,6 +9,7 @@ import { Leaderboard } from '@/components/shared/Leaderboard';
 import { ProjectorView } from '@/components/projector/ProjectorView';
 import { useSound } from '@/hooks/useSound';
 import { AudioToggle } from '@/components/shared/AudioToggle';
+import { isTrueFalseMatch, isTrueValue, isFalseValue } from '@/lib/gameLogic';
 
 export default function TeacherPage() {
   const params = useParams();
@@ -273,8 +274,14 @@ export default function TeacherPage() {
 
                 {(() => {
                   const correctKey = roomState.teacherInfo?.correctAnswer || currentQ.correctAnswer;
-                  const optText = currentQ.options?.find((o) => o.key === correctKey)?.text;
+                  const isTF = currentQ.type === 'true_false';
+                  const optText = currentQ.options?.find((o) =>
+                    o.key === correctKey || (isTF && (isTrueFalseMatch(o.key, correctKey || '') || isTrueFalseMatch(o.text, correctKey || '')))
+                  )?.text;
                   const explanationText = roomState.teacherInfo?.explanation || currentQ.explanation;
+                  const displayKey = isTF
+                    ? (isTrueValue(correctKey) ? 'T - Đúng' : isFalseValue(correctKey) ? 'F - Sai' : correctKey)
+                    : correctKey;
                   return (
                     <>
                       <div className="p-3.5 bg-green-50 rounded-2xl border-2 border-green-200 mb-3 shadow-sm">
@@ -282,8 +289,8 @@ export default function TeacherPage() {
                           Đáp án đúng:
                         </span>
                         <p className="text-base font-black text-green-900 leading-snug break-words whitespace-normal">
-                          ⭐ <span className="text-brand-red font-black text-lg mr-1">{correctKey || 'Đang tải...'}</span>
-                          {optText ? ` - ${optText}` : ''}
+                          ⭐ <span className="text-brand-red font-black text-lg mr-1">{displayKey || 'Đang tải...'}</span>
+                          {!isTF && optText ? ` - ${optText}` : ''}
                         </p>
                       </div>
 

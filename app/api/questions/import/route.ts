@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/authOptions';
 import { db } from '@/lib/db';
 import { questions } from '@/lib/schema';
 import { randomUUID } from 'crypto';
+import { isTrueFalseMatch } from '@/lib/gameLogic';
 
 export async function POST(req: NextRequest) {
   try {
@@ -23,14 +24,26 @@ export async function POST(req: NextRequest) {
       const item = items[i];
       if (!item.content || !item.content.trim()) continue;
 
-      const opts = Array.isArray(item.options) && item.options.length > 0
-        ? item.options
-        : [
-            { key: 'A', text: '' },
-            { key: 'B', text: '' },
-            { key: 'C', text: '' },
-            { key: 'D', text: '' },
+      const isTF = item.type === 'true_false';
+      let opts = Array.isArray(item.options) && item.options.length > 0 ? item.options : undefined;
+      let ca = (item.correctAnswer || 'A').toString().trim();
+
+      if (isTF) {
+        if (!opts || opts.length < 2) {
+          opts = [
+            { key: 'T', text: 'Đúng' },
+            { key: 'F', text: 'Sai' },
           ];
+        }
+        ca = isTrueFalseMatch(ca, 'F') ? 'F' : 'T';
+      } else if (!opts) {
+        opts = [
+          { key: 'A', text: '' },
+          { key: 'B', text: '' },
+          { key: 'C', text: '' },
+          { key: 'D', text: '' },
+        ];
+      }
 
       validQuestions.push({
         id: randomUUID(),
@@ -42,7 +55,7 @@ export async function POST(req: NextRequest) {
         content: item.content.trim(),
         imageUrl: item.imageUrl ?? null,
         options: opts,
-        correctAnswer: (item.correctAnswer || 'A').toUpperCase().trim(),
+        correctAnswer: ca,
         matchingPairs: item.matchingPairs ?? null,
         explanation: item.explanation ?? null,
         tags: Array.isArray(item.tags) ? item.tags : [],
